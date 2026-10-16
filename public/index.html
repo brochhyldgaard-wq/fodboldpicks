@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tipsligaen</title>
-  <meta name="theme-color" content="#2f8a43">
+  <meta name="theme-color" content="#0b1a12">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -18,19 +18,37 @@
   <script src="/app.js" defer></script>
 </head>
 <body>
+  <div class="stadium" aria-hidden="true"></div>
   <div class="wrap">
     <header class="pitch">
+      <svg class="lines" viewBox="0 0 720 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <g fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2.5">
+          <rect x="14" y="14" width="692" height="192"/>
+          <line x1="360" y1="14" x2="360" y2="206"/>
+          <circle cx="360" cy="110" r="58"/>
+          <rect x="14" y="52" width="96" height="116"/>
+          <rect x="14" y="84" width="34" height="52"/>
+          <path d="M110 84a36 36 0 0 1 0 52"/>
+          <rect x="610" y="52" width="96" height="116"/>
+          <rect x="672" y="84" width="34" height="52"/>
+          <path d="M610 84a36 36 0 0 0 0 52"/>
+          <path d="M14 26a12 12 0 0 0 12-12M694 14a12 12 0 0 0 12 12M14 194a12 12 0 0 1 12 12M694 206a12 12 0 0 1 12-12"/>
+          <rect x="6" y="94" width="8" height="32"/>
+          <rect x="706" y="94" width="8" height="32"/>
+        </g>
+        <g fill="rgba(255,255,255,.7)"><circle cx="360" cy="110" r="4"/><circle cx="80" cy="110" r="3"/><circle cx="640" cy="110" r="3"/></g>
+      </svg>
       <div class="brand">
         <h1>Tipsligaen</h1>
         <p>Premier League 2026/27</p>
       </div>
-      <nav class="tabs" id="tabs" hidden>
-        <button data-view="kampe" aria-current="page">Kampe</button>
-        <button data-view="stilling">Stilling</button>
-        <button data-view="mere">Mere</button>
-      </nav>
     </header>
-    <main id="main"><div class="card"><p class="muted">Henter...</p></div></main>
+    <nav class="tabs" id="tabs" hidden>
+      <button data-view="kampe" aria-current="page">Kampe</button>
+      <button data-view="stilling">Stilling</button>
+      <button data-view="mere">Mere</button>
+    </nav>
+    <main id="main"><div class="loading"><span class="roll"></span><p>Bolden ruller...</p></div></main>
   </div>
 </body>
 </html>

@@ -16,6 +16,8 @@ const S = {
 };
 
 // ---------- hjælpere ----------
+const BALL_SVG = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#fff" stroke="#111" stroke-width="3"/><path d="M32 20l11 8-4 13H25l-4-13z" fill="#111"/><path d="M32 2v18M43 28l17-6M39 41l10 15M25 41L15 56M21 28L4 22" stroke="#111" stroke-width="3"/><path d="M27 3l5 4 5-4M58 17l-1 7 5 3M54 54l-6-1-3 6M10 54l6-1 3 6M6 17l1 7-5 3" fill="#111"/></svg>';
+function ball(cls = "ball") { const s = document.createElement("span"); s.className = cls; s.innerHTML = BALL_SVG; return s; }
 const $ = (s, el = document) => el.querySelector(s);
 function h(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
@@ -216,15 +218,19 @@ function renderRound(main) {
   const first = ms[0]?.kickoff, last = ms[ms.length - 1]?.kickoff;
   const range = first ? (fmtShort(first) === fmtShort(last) ? fmtDay(first) : `${fmtShort(first)} til ${fmtShort(last)}`) : "";
   const go = async (r) => { S.round = r; await loadRoundTips(); render(); };
-  main.append(h("div", { class: "board" },
-    h("button", { class: "arrow", "aria-label": "Forrige runde", disabled: i <= 0, onclick: () => go(rs[i - 1]) }, "‹"),
-    h("h2", {}, `Runde ${S.round}`, h("small", { text: range })),
-    h("button", { class: "arrow", "aria-label": "Næste runde", disabled: i >= rs.length - 1, onclick: () => go(rs[i + 1]) }, "›")));
-  main.append(h("p", { class: "roundsum", id: "roundsum" }));
+  main.append(h("section", { class: "scoreboard", "aria-label": "Rundetavle" },
+    h("div", { class: "sb-top" },
+      h("button", { class: "arrow", "aria-label": "Forrige runde", disabled: i <= 0, onclick: () => go(rs[i - 1]) }, "‹"),
+      h("div", { class: "sb-title" },
+        h("span", { class: "sb-label", text: "Runde" }),
+        h("span", { class: "led big", text: String(S.round).padStart(2, "0") })),
+      h("button", { class: "arrow", "aria-label": "Næste runde", disabled: i >= rs.length - 1, onclick: () => go(rs[i + 1]) }, "›")),
+    h("div", { class: "sb-date", text: range }),
+    h("div", { class: "sb-stats", id: "roundsum" })));
   let lastDay = "";
   for (const m of ms) {
     const d = fmtDay(m.kickoff);
-    if (d !== lastDay) { main.append(h("div", { class: "day", text: d })); lastDay = d; }
+    if (d !== lastDay) { main.append(h("div", { class: "day" }, h("span", { text: d }))); lastDay = d; }
     main.append(matchCard(m));
   }
   refreshRows();
@@ -246,6 +252,7 @@ function matchCard(m) {
   const card = h("article", { class: "match", "data-id": m.id },
     h("div", { class: "mtop" }, h("span", { class: "time" }), h("span", { class: "status" })),
     h("div", { class: "mmid" },
+      h("div", { class: "circle", "aria-hidden": "true" }),
       h("div", { class: "team" }, crest(m.home_crest, m.home), h("span", { text: m.home })),
       h("div", { class: "tip" }, hw.el, h("span", { class: "colon", "aria-hidden": "true" }, ":"), aw.el,
         h("div", { class: "digits", "aria-label": "Dit tip" }, dh, h("span", { class: "colon", "aria-hidden": "true" }, ":"), da)),
@@ -352,14 +359,16 @@ function refreshCard(card) {
   // status
   const status = $(".status", card); status.innerHTML = "";
   const p = points(mine, m);
-  if (isDone(m)) status.append(h("span", { class: "pts p" + p, text: `${p} p` }));
+  if (isDone(m)) status.append(p === 100 ? h("span", { class: "pts p100" }, ball("ball sm"), "Ciffer! 100 p") : h("span", { class: "pts p" + p, text: p === 20 ? "Udfald 20 p" : "0 p" }));
   else if (OFF.includes(m.status)) status.append(h("span", { text: "Udsat" }));
-  else if (isLive(m) || (st && !isDone(m))) status.append(h("span", { class: "live", text: isLive(m) && m.home_goals != null ? `Live ${m.home_goals}–${m.away_goals}` : "I gang" }));
+  else if (isLive(m) || (st && !isDone(m))) status.append(h("span", { class: "live", text: isLive(m) && m.home_goals != null ? `Live ${m.home_goals}–${m.away_goals}` : "Kampen er i gang" }));
   else if (card._msg && Date.now() - card._msg.at < 3000) status.append(h("span", { class: card._msg.kind, text: card._msg.text }));
   else if (!mine) status.append(h("span", { text: "Mangler tip" }));
   else status.append(h("span", { class: "ok", text: "Tippet" }));
 
-  $(".final", card).textContent = isDone(m) ? `Slutresultat ${m.home_goals}–${m.away_goals}` : st && !isDone(m) ? "Dit tip er låst" : "";
+  const fin = $(".final", card); fin.innerHTML = "";
+  if (isDone(m)) fin.append(h("span", { class: "ft" }, "Slut"), h("span", { class: "led", text: `${m.home_goals}–${m.away_goals}` }));
+  else if (st) fin.append(h("span", { class: "muted-light", text: "Dit tip er låst" }));
 
   // andres tips fra kampstart
   const others = $(".others", card); others.innerHTML = "";
@@ -380,10 +389,9 @@ function updateRoundSum() {
   const done = ms.filter(isDone);
   const missing = ms.filter((m) => !started(m) && !OFF.includes(m.status) && !S.myTips.has(m.id)).length;
   const pts = done.reduce((s, m) => s + (points(S.myTips.get(m.id), m) || 0), 0);
-  const parts = [];
-  if (done.length) parts.push(`Dine point i runden: ${pts}`);
-  if (missing) parts.push(`${missing} ${missing === 1 ? "kamp mangler" : "kampe mangler"} dit tip`);
-  el.textContent = parts.join(". ");
+  const cell = (label, val, warn) => h("div", { class: "sb-cell" + (warn ? " warn" : "") }, h("span", { class: "led", text: String(val) }), h("span", { class: "sb-label", text: label }));
+  el.innerHTML = "";
+  el.append(cell("Dine point", pts), cell("Mangler tip", missing, missing > 0), cell("Spillet", `${done.length}/${ms.length}`));
 }
 
 function adminPanel(m) {
@@ -428,6 +436,12 @@ function computeStandings() {
   return { complete, byRound, winners, table };
 }
 
+function trophy() {
+  const s = document.createElement("span");
+  s.innerHTML = '<svg viewBox="0 0 64 64" width="56" height="56"><path d="M18 6h28v14c0 10-6 18-14 18S18 30 18 20z" fill="#f6d33c"/><path d="M18 10H8c0 10 4 15 11 16M46 10h10c0 10-4 15-11 16" fill="none" stroke="#f6d33c" stroke-width="4"/><rect x="28" y="38" width="8" height="10" fill="#d9b21f"/><rect x="18" y="48" width="28" height="8" rx="2" fill="#f6d33c"/><rect x="14" y="56" width="36" height="5" rx="2" fill="#d9b21f"/></svg>';
+  return s;
+}
+
 function renderStandings(main) {
   const { complete, byRound, table } = computeStandings();
 
@@ -444,7 +458,7 @@ function renderStandings(main) {
     const w = lastDone != null ? leaders(lastDone) : null;
     const c = current != null ? leaders(current) : null;
     main.append(h("div", { class: "card winner" },
-      h("div", { class: "cup", "aria-hidden": "true" }, "🏆"),
+      h("div", { class: "cup", "aria-hidden": "true" }, trophy()),
       h("div", {},
         w ? h("h2", { text: `Rundens vinder, runde ${lastDone}` }) : h("h2", { text: `Runde ${current} er i gang` }),
         w ? h("div", { class: "names", text: w.best > 0 ? w.names.join(" og ") : "Ingen vinder" }) : null,
@@ -459,26 +473,35 @@ function renderStandings(main) {
     if (!prev || r.points !== prev.points || r.exact !== prev.exact) pos = i + 1;
     prev = r;
     const top = pos === 1 && r.points > 0;
-    tb.append(h("tr", { class: (top ? "top " : "") + (r.user_id === uid() ? "me" : "") },
+    const zone = top ? "z-champ" : (table.length >= 4 && i === table.length - 1 && r.points < table[0].points ? "z-releg" : "");
+    tb.append(h("tr", { class: (top ? "top " : "") + zone + (r.user_id === uid() ? " me" : "") },
       h("td", { class: "pos" }, top ? h("span", { text: pos }) : String(pos)),
       h("td", { class: "name l", text: nick(r.user_id) }),
-      h("td", { text: r.wins }), h("td", { text: r.exact }), h("td", { text: r.outcome }),
+      h("td", { class: "c", text: r.wins }), h("td", { class: "c", text: r.outcome }), h("td", { class: "c", text: r.exact }),
       h("td", { class: "total", text: r.points })));
   });
-  main.append(h("div", { class: "card" },
-    h("h2", { text: "Sæsonstilling" }),
+  const lastRound = Math.max(0, ...S.roundScores.map((r) => r.round));
+  main.append(h("div", { class: "card table-card league" },
+    h("div", { class: "league-head" },
+      h("h2", { text: "Sæsonstilling" }),
+      lastRound ? h("span", { class: "sub", text: `Efter runde ${lastRound}` }) : null),
     h("div", { class: "tablewrap" }, h("table", {},
       h("thead", {}, h("tr", {},
         h("th", {}, "#"), h("th", { class: "l" }, "Spiller"),
-        h("th", { title: "Vundne runder" }, "Sejre"), h("th", { title: "Rigtige ciffertips (100 p)" }, "Ciffer"),
-        h("th", { title: "Rigtigt udfald (20 p)" }, "Udfald"), h("th", {}, "Point"))),
+        h("th", { class: "two", title: "Vundne runder" }, "Runde-", h("br"), "sejre"), h("th", { class: "two", title: "Rigtigt udfald, 20 point" }, "Rigtigt", h("br"), "udfald"),
+        h("th", { class: "two", title: "Rigtige ciffertips, 100 point" }, "Rigtige", h("br"), "cifre"), h("th", {}, "Point"))),
       tb)),
-    h("p", { class: "muted", style: "margin-top:10px", text: "Ved pointlighed afgør flest ciffertips. Rundesejre tælles, når alle rundens kampe er spillet." })));
+    h("div", { class: "legend" },
+      h("span", { class: "key champ" }, "Fører ligaen"),
+      table.length >= 4 ? h("span", { class: "key releg" }, "Nedrykningsstreg") : null),
+    h("p", { class: "muted", style: "margin-top:10px", text: "Ved pointlighed afgør flest rigtige cifre, derefter flest runde-sejre. Runde-sejre tælles, når alle rundens kampe er spillet." })));
+
+  renderProgress(main);
 
   // Top 10 runder
   const top10 = [...S.roundScores].filter((r) => r.points > 0)
     .sort((a, b) => b.points - a.points || b.exact - a.exact || a.round - b.round).slice(0, 10);
-  const card = h("div", { class: "card" }, h("h2", { text: "Sæsonens 10 bedste runder" }));
+  const card = h("div", { class: "card table-card minor" }, h("h2", { text: "Sæsonens 10 bedste spillerunder" }));
   if (!top10.length) card.append(h("p", { class: "empty", text: "Listen fyldes, når de første kampe er færdigspillet." }));
   else {
     const body = h("tbody");
@@ -489,10 +512,102 @@ function renderStandings(main) {
       h("td", { text: r.exact }),
       h("td", { class: "total", text: r.points }))));
     card.append(h("div", { class: "tablewrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", { class: "l" }, "Spiller"), h("th", {}, "Runde"), h("th", {}, "Ciffer"), h("th", {}, "Point"))),
+      h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", { class: "l" }, "Spiller"), h("th", {}, "Spillerunde"), h("th", {}, "Rigtige cifre"), h("th", {}, "Point"))),
       body)));
-    if (top10.some((r) => !complete.has(r.round))) card.append(h("p", { class: "muted", style: "margin-top:10px", text: "* Runden er ikke færdigspillet endnu." }));
+    if (top10.some((r) => !complete.has(r.round))) card.append(h("p", { class: "muted", style: "margin-top:10px", text: "* Spillerunden er ikke færdigspillet endnu." }));
   }
+  main.append(card);
+}
+
+// ---------- Graf: udviklingen runde for runde ----------
+const PCOL = ["#ffc928", "#4fc3f7", "#ff7a59", "#9ccc65", "#ce93d8", "#ffffff", "#26c6da", "#f48fb1", "#ffb74d", "#b0bec5"];
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function progressData() {
+  const rounds = [...new Set(S.roundScores.map((r) => r.round))].sort((a, b) => a - b);
+  const ids = S.players.map((p) => p.user_id);
+  const cum = new Map(ids.map((id) => [id, { p: 0, e: 0 }]));
+  const series = new Map(ids.map((id) => [id, []]));
+  for (const r of rounds) {
+    for (const row of S.roundScores.filter((x) => x.round === r)) {
+      const c = cum.get(row.user_id); if (c) { c.p += row.points; c.e += row.exact; }
+    }
+    const sorted = [...ids].sort((a, b) => cum.get(b).p - cum.get(a).p || cum.get(b).e - cum.get(a).e);
+    let pos = 0, prev = null;
+    sorted.forEach((id, i) => {
+      const c = cum.get(id);
+      if (!prev || c.p !== prev.p || c.e !== prev.e) pos = i + 1;
+      prev = { p: c.p, e: c.e };
+      series.get(id).push({ round: r, pos, pts: c.p });
+    });
+  }
+  return { rounds, series, ids };
+}
+
+function renderProgress(main) {
+  const { rounds, series, ids } = progressData();
+  const card = h("div", { class: "card chart-card" }, h("h2", { text: "Udviklingen runde for runde" }));
+  if (!rounds.length || !ids.length) {
+    card.append(h("p", { class: "empty-dark", text: "Grafen tegnes, når den første runde har givet point." }));
+    main.append(card); return;
+  }
+  const mode = S.chartMode || "pos";
+  card.append(h("div", { class: "seg", role: "group", "aria-label": "Vis" },
+    ...[["pos", "Placering"], ["pts", "Point"]].map(([k, l]) =>
+      h("button", { class: k === mode ? "on" : "", "aria-pressed": k === mode ? "true" : "false", onclick: () => { S.chartMode = k; render(); } }, l))));
+
+  const n = ids.length, W = 520, padL = 40, padR = 112, padT = 18, padB = 42;
+  const H = mode === "pos" ? padT + padB + Math.max(n - 1, 1) * 44 : 300;
+  const maxPts = Math.max(1, ...ids.map((id) => series.get(id).at(-1).pts));
+  const step = Math.pow(10, Math.floor(Math.log10(maxPts))) * (maxPts / Math.pow(10, Math.floor(Math.log10(maxPts))) > 5 ? 2 : 1);
+  const top = Math.ceil(maxPts / step) * step || 1;
+  const X = (i) => rounds.length === 1 ? padL + (W - padL - padR) / 2 : padL + i * (W - padL - padR) / (rounds.length - 1);
+  const Y = (v) => mode === "pos" ? padT + (n > 1 ? (v - 1) * (H - padT - padB) / (n - 1) : (H - padT - padB) / 2) : padT + (1 - v / top) * (H - padT - padB);
+  const focus = S.chartFocus || null;
+  let g = "";
+
+  // gitter
+  if (mode === "pos") {
+    for (let p = 1; p <= n; p++) g += `<line x1="${padL}" x2="${W - padR + 8}" y1="${Y(p)}" y2="${Y(p)}" class="grid"/><text x="${padL - 14}" y="${Y(p) + 6}" class="ax" text-anchor="end">${p}</text>`;
+  } else {
+    for (let v = 0; v <= top; v += step) g += `<line x1="${padL}" x2="${W - padR + 8}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${padL - 10}" y="${Y(v) + 6}" class="ax" text-anchor="end">${v}</text>`;
+  }
+  const every = Math.ceil(rounds.length / 7);
+  rounds.forEach((r, i) => { if (i % every === 0 || i === rounds.length - 1) g += `<text x="${X(i)}" y="${H - 12}" class="ax" text-anchor="middle">R${r}</text>`; });
+
+  // linjer, mig og fokus tegnes sidst så de ligger øverst
+  const order = [...ids].sort((a, b) => (a === focus || a === uid() ? 1 : 0) - (b === focus || b === uid() ? 1 : 0));
+  const ends = [];
+  for (const id of order) {
+    const i = ids.indexOf(id), col = PCOL[i % PCOL.length], pts = series.get(id);
+    const dim = focus && focus !== id;
+    const wide = id === uid() || id === focus;
+    const val = (d) => mode === "pos" ? d.pos : d.pts;
+    const d = pts.map((p, k) => `${k ? "L" : "M"}${X(k).toFixed(1)} ${Y(val(p)).toFixed(1)}`).join(" ");
+    g += `<g class="ln${dim ? " dim" : ""}">`;
+    if (pts.length > 1) g += `<path d="${d}" stroke="${col}" stroke-width="${wide ? 5 : 3}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach((p, k) => { g += `<circle cx="${X(k)}" cy="${Y(val(p))}" r="${wide ? 6 : 4.5}" fill="${col}" stroke="#0a120d" stroke-width="2"/>`; });
+    g += `</g>`;
+    const last = pts.at(-1);
+    ends.push({ id, col, dim, y: Y(val(last)), label: mode === "pos" ? nick(id) : `${nick(id)} ${last.pts}` });
+  }
+  // navne i højre side, skubbet fra hinanden ved lighed
+  ends.sort((a, b) => a.y - b.y);
+  let lastY = -99;
+  for (const e of ends) {
+    const yy = Math.max(e.y, lastY + 22); lastY = yy;
+    g += `<text x="${W - padR + 16}" y="${yy + 6}" class="nm${e.dim ? " dim" : ""}" fill="${e.col}">${esc(e.label)}</text>`;
+  }
+  const wrap = h("div", { class: "chart" });
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${mode === "pos" ? "Placering" : "Point"} for hver spiller efter hver runde">${g}</svg>`;
+  card.append(wrap);
+
+  // forklaring: tryk for at fremhæve en spiller
+  card.append(h("div", { class: "chart-legend" },
+    ids.map((id, i) => h("button", { class: focus === id ? "on" : "", "aria-pressed": focus === id ? "true" : "false",
+      onclick: () => { S.chartFocus = S.chartFocus === id ? null : id; render(); } },
+      h("span", { class: "dot", style: `background:${PCOL[i % PCOL.length]}` }), nick(id)))));
+  card.append(h("p", { class: "hint", text: "Tryk på et navn for at fremhæve spilleren." }));
   main.append(card);
 }
 
