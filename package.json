@@ -1,0 +1,12 @@
+{
+  "name": "tipsligaen",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Premier League-tipsspil med automatiske resultater og påmindelser",
+  "dependencies": {
+    "@netlify/functions": "2.8.2",
+    "@supabase/supabase-js": "2.45.4",
+    "web-push": "3.6.7"
+  }
+}
