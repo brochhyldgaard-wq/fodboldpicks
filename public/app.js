@@ -134,26 +134,32 @@ function defaultRound() {
 }
 
 // ---------- login ----------
-function renderAuth(mode = "login", msg = "") {
+function renderAuth(mode = "login", msg = "", keep = {}) {
   $("#tabs").hidden = true;
   const main = $("#main"); main.innerHTML = "";
-  const email = h("input", { type: "email", id: "email", autocomplete: "email", required: true });
-  const pw = h("input", { type: "password", id: "pw", autocomplete: mode === "login" ? "current-password" : "new-password", minlength: "6", required: true });
+  // Ingen autokorrektur, ingen store forbogstaver: telefoner ændrer ellers i e-mail og adgangskode
+  const noFix = { autocapitalize: "none", autocorrect: "off", spellcheck: "false" };
+  const email = h("input", { type: "email", id: "email", autocomplete: "email", inputmode: "email", required: true, ...noFix });
+  const pw = h("input", { type: "password", id: "pw", autocomplete: mode === "login" ? "current-password" : "new-password", minlength: "6", required: true, ...noFix });
+  email.value = keep.email || "";
+  pw.value = keep.password || "";
+  const show = h("input", { type: "checkbox", id: "showpw", onchange: (e) => { pw.type = e.target.checked ? "text" : "password"; } });
   const submit = h("button", { class: "btn flood", type: "submit" }, mode === "login" ? "Log ind" : "Opret bruger");
   const form = h("form", {
     onsubmit: async (e) => {
       e.preventDefault(); submit.disabled = true;
-      const creds = { email: email.value.trim(), password: pw.value };
+      const creds = { email: email.value.trim().toLowerCase(), password: pw.value.replace(/\s+$/, "") };
       const { data, error } = mode === "login" ? await S.sb.auth.signInWithPassword(creds) : await S.sb.auth.signUp(creds);
       submit.disabled = false;
-      if (error) return renderAuth(mode, oversaet(error.message));
+      if (error) return renderAuth(mode, oversaet(error.message), { email: email.value, password: pw.value });
       if (mode === "signup" && !data.session) return renderAuth("login", "Brugeren er oprettet, men skal bekræftes via mail. Bed administratoren slå bekræftelse fra i Supabase.");
     },
   },
     h("div", { class: "field" }, h("label", { for: "email" }, "E-mail"), email),
     h("div", { class: "field" }, h("label", { for: "pw" }, mode === "login" ? "Adgangskode" : "Vælg en adgangskode (mindst 6 tegn)"), pw),
+    h("label", { for: "showpw", class: "check", style: "margin:0 0 14px" }, show, h("span", { text: "Vis adgangskode" })),
     h("div", { class: "row" }, submit,
-      h("button", { type: "button", class: "linkbtn", onclick: () => renderAuth(mode === "login" ? "signup" : "login") },
+      h("button", { type: "button", class: "linkbtn", onclick: () => renderAuth(mode === "login" ? "signup" : "login", "", { email: email.value }) },
         mode === "login" ? "Ny her? Opret bruger" : "Har du en bruger? Log ind")));
   main.append(h("div", { class: "card" },
     h("h2", { text: mode === "login" ? "Log ind" : "Opret bruger" }),
@@ -161,7 +167,7 @@ function renderAuth(mode = "login", msg = "") {
     form));
 }
 function oversaet(m) {
-  if (/Invalid login/i.test(m)) return "Forkert e-mail eller adgangskode.";
+  if (/Invalid login/i.test(m)) return "Forkert e-mail eller adgangskode. Slå \"Vis adgangskode\" til og tjek, at telefonen ikke har ændret noget.";
   if (/already registered/i.test(m)) return "Der findes allerede en bruger med den e-mail. Log ind i stedet.";
   if (/at least 6/i.test(m)) return "Adgangskoden skal være mindst 6 tegn.";
   return m;
