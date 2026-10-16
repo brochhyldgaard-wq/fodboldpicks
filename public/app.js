@@ -708,7 +708,36 @@ function adminCard() {
         toast(r.ok ? `${j.count} kampe hentet` : j.error || "Kampene kunne ikke hentes");
         if (r.ok) { S.round = null; await loadAll(); S.round = defaultRound(); await loadRoundTips(); }
       } }, "Hent kampe nu")),
-    h("label", { for: "admtoggle", class: "check" }, toggle, h("span", { text: "Vis felter til manuelle resultater under Kampe" })));
+    h("label", { for: "admtoggle", class: "check" }, toggle, h("span", { text: "Vis felter til manuelle resultater under Kampe" })),
+    usersSection());
+}
+
+// Brugere og logins: administratoren kan se e-mails og give en ny adgangskode
+function usersSection() {
+  const box = h("div", { class: "users" }, h("h3", { text: "Brugere og logins" }), h("p", { class: "muted", text: "Henter brugere..." }));
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "aldrig";
+  S.sb.rpc("admin_list_users").then(({ data, error }) => {
+    box.querySelectorAll("p, ul").forEach((n) => n.remove());
+    if (error) {
+      box.append(h("p", { class: "muted", text: /admin_list_users/.test(error.message || "") || error.code === "PGRST202"
+        ? "Funktionen mangler i databasen. Kør filen admin-funktioner.sql i Supabase SQL Editor."
+        : "Brugerne kunne ikke hentes: " + error.message }));
+      return;
+    }
+    box.append(h("p", { class: "muted", text: "Hjælp en spiller, der ikke kan logge ind: tjek e-mailen, og giv en ny adgangskode, som du sender til spilleren." }));
+    box.append(h("ul", { class: "userlist" }, (data || []).map((u) => h("li", {},
+      h("div", { class: "u-main" },
+        h("b", { text: u.nick || "Ikke tilmeldt endnu" }), u.is_admin ? h("span", { class: "tag", text: "Administrator" }) : null,
+        h("span", { class: "u-mail", text: u.email }),
+        h("span", { class: "u-meta", text: `Oprettet ${fmt(u.created_at)}. Seneste login ${fmt(u.last_sign_in_at)}.` })),
+      h("button", { class: "btn ghost small", onclick: async () => {
+        const pw = prompt(`Ny adgangskode til ${u.email} (mindst 6 tegn):`);
+        if (pw == null) return;
+        const { error: e2 } = await S.sb.rpc("admin_set_password", { p_user: u.user_id, p_password: pw.trim() });
+        toast(e2 ? (e2.message || "Adgangskoden blev ikke ændret").replace(/^.*?:\s*/, "") : `Ny adgangskode gemt. Send den til ${u.nick || u.email}.`);
+      } }, "Ny adgangskode")))));
+  });
+  return box;
 }
 
 init();

@@ -336,3 +336,13 @@ tr.me td.name { font-weight: 800; }
 .league th:first-child, .league td:first-child { padding-left: 12px; }
 .league th:last-child, .league td:last-child { padding-right: 12px; }
 @media (max-width: 380px) { .league td.c { width: 38px; font-size: 17px; } .league th.two { font-size: 9px; } .wrap { padding-left: 8px; padding-right: 8px; } }
+
+/* Brugere og logins (administrator) */
+.users { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--paper-line); }
+.userlist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.userlist li { display: grid; gap: 10px; justify-items: start; padding: 10px 12px; border: 1px solid var(--paper-line); border-radius: 10px; }
+.u-main { display: grid; gap: 2px; min-width: 0; }
+.u-mail { font-size: 14px; overflow-wrap: anywhere; }
+.u-meta { font-size: 12px; color: var(--paper-muted); }
+.tag { justify-self: start; font: 700 11px var(--body); letter-spacing: 1px; text-transform: uppercase; background: var(--led); color: #2b2100; padding: 2px 6px; border-radius: 4px; }
+.btn.small { font-size: 14px; padding: 9px 12px; flex: none; }
