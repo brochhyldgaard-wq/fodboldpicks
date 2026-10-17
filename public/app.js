@@ -48,6 +48,87 @@ const nick = (uid) => S.players.find((p) => p.user_id === uid)?.nick || "Spiller
 const uid = () => S.session?.user?.id;
 const rounds = () => [...new Set(S.matches.map((m) => m.round))].sort((a, b) => a - b);
 
+// ---------- citater ----------
+function hashStr(x) { let n = 0; for (const c of String(x)) n = (n * 31 + c.charCodeAt(0)) >>> 0; return n; }
+function quote(cat, key) {
+  const list = (window.QUOTES && window.QUOTES[cat]) || [];
+  if (!list.length) return null;
+  return list[key == null ? Math.floor(Math.random() * list.length) : hashStr(cat + ":" + key) % list.length];
+}
+// Citatkort: vises i 5 sekunder, når det kommer i syne, og bliver derefter til en lille "Citat"-knap
+const SEEN_KEY = "tl-seen-quotes";
+let seenQuotes;
+try { seenQuotes = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch (e) { seenQuotes = new Set(); }
+function markSeen(key) {
+  seenQuotes.add(key);
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seenQuotes].slice(-300))); } catch (e) {}
+}
+const QUOTE_MS = 5000;   // så længe et citat vises
+const QUOTE_GAP = 3000;  // pause, før næste citat må vises
+// Kun ét citat ad gangen: de andre venter i kø, til de er synlige, og pausen er gået
+const QQ = { active: null, lastClose: 0, waiting: new Set(), timer: null };
+function qSchedule() {
+  clearTimeout(QQ.timer);
+  if (QQ.active && !QQ.active.isConnected) { QQ.active = null; QQ.lastClose = Date.now(); }
+  if (QQ.active) return;
+  const wait = QQ.lastClose + QUOTE_GAP - Date.now();
+  if (wait > 0) { QQ.timer = setTimeout(qSchedule, wait + 20); return; }
+  let next = null;
+  for (const w of [...QQ.waiting]) {
+    if (!w.isConnected) { QQ.waiting.delete(w); continue; }
+    if (w._visible && (!next || w.getBoundingClientRect().top < next.getBoundingClientRect().top)) next = w;
+  }
+  if (next) { QQ.waiting.delete(next); next._open(); }  // øverste synlige citat først
+}
+const quoteObserver = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+  for (const e of entries) e.target._visible = e.isIntersecting && e.intersectionRatio >= 0.6;
+  qSchedule();
+}, { threshold: [0, 0.6] }) : null;
+
+function quoteEl(q, variant, key) {
+  if (!q) return null;
+  key = key || q.t;
+  const mic = h("span", { class: "mic", "aria-hidden": "true" });
+  mic.innerHTML = '<svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  const fig = h("figure", { class: "quote", title: "Tryk for at skjule" },
+    h("blockquote", { text: q.t }),
+    h("figcaption", { class: "strap" }, h("span", { class: "tag" }, mic, "Citat"), h("span", { class: "name", text: q.a })),
+    h("span", { class: "qtimer", "aria-hidden": "true" }));
+  const pill = h("button", { class: "qpill", type: "button", "aria-label": `Vis citat af ${q.a}` }, mic.cloneNode(true), "Citat");
+  const wrap = h("div", { class: "qwrap closed " + (variant || ""), "data-qkey": key }, fig, pill);
+  let t = null;
+  wrap._open = () => {
+    if (QQ.active && QQ.active !== wrap) QQ.active._close(true);
+    QQ.active = wrap; markSeen(key);
+    wrap.classList.remove("closed", "closing", "running"); void wrap.offsetWidth; wrap.classList.add("running");
+    clearTimeout(t); t = setTimeout(() => wrap._close(), QUOTE_MS);
+  };
+  wrap._close = (instant) => {
+    clearTimeout(t);
+    if (QQ.active === wrap) { QQ.active = null; QQ.lastClose = Date.now(); }
+    const done = () => { wrap.classList.remove("closing", "running"); wrap.classList.add("closed"); };
+    if (wrap.classList.contains("closed")) return;
+    if (instant || reduceMotion) done(); else { wrap.classList.add("closing"); setTimeout(done, 350); }
+    qSchedule();
+  };
+  pill.addEventListener("click", () => { QQ.waiting.delete(wrap); wrap._open(); });
+  fig.addEventListener("click", () => wrap._close());
+  if (!seenQuotes.has(key)) {
+    QQ.waiting.add(wrap);
+    if (quoteObserver) requestAnimationFrame(() => quoteObserver.observe(wrap));
+    else { wrap._visible = true; setTimeout(qSchedule, 0); }
+  }
+  return wrap;
+}
+// Genbrug et citat, der allerede står på siden, så det ikke springer frem igen ved opdatering
+function setQuote(container, q, variant, key) {
+  if (!container) return;
+  if (!q) { container.innerHTML = ""; container.dataset.qkey = ""; return; }
+  if (container.dataset.qkey === key && container.firstChild) return;
+  container.innerHTML = ""; container.dataset.qkey = key;
+  container.append(quoteEl(q, variant, key));
+}
+
 let toastTimer;
 function toast(msg) {
   document.querySelectorAll(".toast").forEach((t) => t.remove());
@@ -165,6 +246,8 @@ function renderAuth(mode = "login", msg = "", keep = {}) {
     h("h2", { text: mode === "login" ? "Log ind" : "Opret bruger" }),
     msg ? h("p", { class: "muted", role: "alert", text: msg }) : null,
     form));
+  if (!S.loginQuote) S.loginQuote = quote("generelt");
+  main.append(quoteEl(S.loginQuote, "q-free", "login:" + S.loginQuote.t + ":" + Date.now()));
 }
 function oversaet(m) {
   if (/Invalid login/i.test(m)) return "Forkert e-mail eller adgangskode. Slå \"Vis adgangskode\" til og tjek, at telefonen ikke har ændret noget.";
@@ -232,7 +315,8 @@ function renderRound(main) {
         h("span", { class: "led big", text: String(S.round).padStart(2, "0") })),
       h("button", { class: "arrow", "aria-label": "Næste runde", disabled: i >= rs.length - 1, onclick: () => go(rs[i + 1]) }, "›")),
     h("div", { class: "sb-date", text: range }),
-    h("div", { class: "sb-stats", id: "roundsum" })));
+    h("div", { class: "sb-stats", id: "roundsum" }),
+    h("div", { id: "roundquote" })));
   let lastDay = "";
   for (const m of ms) {
     const d = fmtDay(m.kickoff);
@@ -264,6 +348,7 @@ function matchCard(m) {
         h("div", { class: "digits", "aria-label": "Dit tip" }, dh, h("span", { class: "colon", "aria-hidden": "true" }, ":"), da)),
       h("div", { class: "team" }, crest(m.away_crest, m.away), h("span", { text: m.away }))),
     h("div", { class: "final" }),
+    h("div", { class: "mquote" }),
     h("div", { class: "others" }),
     S.admin && S.me.is_admin ? adminPanel(m) : null);
   card._m = m; card._hw = hw; card._aw = aw; card._dh = dh; card._da = da; card._msg = null;
@@ -375,6 +460,7 @@ function refreshCard(card) {
   const fin = $(".final", card); fin.innerHTML = "";
   if (isDone(m)) fin.append(h("span", { class: "ft" }, "Slut"), h("span", { class: "led", text: `${m.home_goals}–${m.away_goals}` }));
   else if (st) fin.append(h("span", { class: "muted-light", text: "Dit tip er låst" }));
+  setQuote($(".mquote", card), p === 100 ? quote("ciffertip", m.id) : null, "q-pitch", "ciffer:" + m.id);
 
   // andres tips fra kampstart
   const others = $(".others", card); others.innerHTML = "";
@@ -398,6 +484,10 @@ function updateRoundSum() {
   const cell = (label, val, warn) => h("div", { class: "sb-cell" + (warn ? " warn" : "") }, h("span", { class: "led", text: String(val) }), h("span", { class: "sb-label", text: label }));
   el.innerHTML = "";
   el.append(cell("Dine point", pts), cell("Mangler tip", missing, missing > 0), cell("Spillet", `${done.length}/${ms.length}`));
+  const rq = $("#roundquote");
+  if (missing > 0) setQuote(rq, quote("manglerTip", S.round), "q-board", "mangler:" + S.round);
+  else if (done.length > 0 && pts === 0) setQuote(rq, quote("nulPoint", S.round), "q-board", "nul:" + S.round);
+  else setQuote(rq, null);
 }
 
 function adminPanel(m) {
@@ -469,7 +559,8 @@ function renderStandings(main) {
         w ? h("h2", { text: `Rundens vinder, runde ${lastDone}` }) : h("h2", { text: `Runde ${current} er i gang` }),
         w ? h("div", { class: "names", text: w.best > 0 ? w.names.join(" og ") : "Ingen vinder" }) : null,
         w && w.best > 0 ? h("p", { text: `${w.best} point` }) : null,
-        c && c.best > 0 ? h("p", { class: "lead", text: `Fører runde ${current} lige nu: ${c.names.join(" og ")} med ${c.best} point` }) : null)));
+        c && c.best > 0 ? h("p", { class: "lead", text: `Fører runde ${current} lige nu: ${c.names.join(" og ")} med ${c.best} point` }) : null),
+      w && w.best > 0 ? quoteEl(quote("rundensVinder", lastDone), "q-in-dark", "vinder:" + lastDone) : null));
   }
 
   // Sæsontabel
@@ -497,6 +588,7 @@ function renderStandings(main) {
         h("th", { class: "two", title: "Vundne runder" }, "Runde-", h("br"), "sejre"), h("th", { class: "two", title: "Rigtigt udfald, 20 point" }, "Rigtigt", h("br"), "udfald"),
         h("th", { class: "two", title: "Rigtige ciffertips, 100 point" }, "Rigtige", h("br"), "cifre"), h("th", {}, "Point"))),
       tb)),
+    table.length && table[0].points > 0 ? quoteEl(quote("forerLigaen", table[0].user_id + ":" + lastRound), "q-league", "leder:" + table[0].user_id + ":" + lastRound) : null,
     h("div", { class: "legend" },
       h("span", { class: "key champ" }, "Fører ligaen"),
       table.length >= 4 ? h("span", { class: "key releg" }, "Nedrykningsstreg") : null),
@@ -627,6 +719,9 @@ function renderMore(main) {
     h("p", { text: "Rigtigt ciffertip giver 100 point. Rigtigt udfald (hjemmesejr, uafgjort eller udesejr) giver 20 point. Forkert tip, intet tip eller en kamp, der ikke spilles, giver 0 point." }),
     h("h3", { text: "Turneringen" }),
     h("p", { text: "Højst 10 spillere. Tabellen tæller hele sæsonen. Rundens vinder er den med flest point i en færdigspillet runde. Resultater hentes automatisk fra football-data.org og kommer lidt efter slutfløjt." })));
+
+  const today = new Date().toISOString().slice(0, 10);
+  main.append(h("div", { class: "card quote-card" }, h("h3", { text: "Dagens citat" }), quoteEl(quote("generelt", today), "q-paper", "dagens:" + today)));
 
   main.append(pushCard());
 

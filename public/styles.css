@@ -346,3 +346,59 @@ tr.me td.name { font-weight: 800; }
 .u-meta { font-size: 12px; color: var(--paper-muted); }
 .tag { justify-self: start; font: 700 11px var(--body); letter-spacing: 1px; text-transform: uppercase; background: var(--led); color: #2b2100; padding: 2px 6px; border-radius: 4px; }
 .btn.small { font-size: 14px; padding: 9px 12px; flex: none; }
+
+/* ---------- Citater: tv-grafik fra pressekonferencen ---------- */
+.qwrap { margin: 14px 0 0; }
+.quote {
+  position: relative; margin: 0; padding: 24px 18px 0 22px; overflow: hidden; border-radius: 12px; cursor: pointer;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1.6px) 0 0 / 6px 6px,
+    linear-gradient(135deg, #0f2318, #071009);
+  box-shadow: inset 0 0 0 2px var(--led), 0 0 22px rgba(255,201,40,.35), 0 10px 24px rgba(0,0,0,.5);
+}
+.quote::before { /* stort citationstegn */
+  content: ""; position: absolute; left: 16px; top: 18px; width: 48px; height: 36px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 36'%3E%3Cpath d='M0 36V20C0 9 6 2 16 0l2 5c-5 2-8 6-8 11h9v20zM27 36V20C27 9 33 2 43 0l2 5c-5 2-8 6-8 11h9v20z' fill='%23ffc928'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(0 0 8px rgba(255,201,40,.55));
+}
+.quote blockquote {
+  position: relative; margin: 0 0 16px; padding-left: 60px; min-height: 40px;
+  font: 700 23px/1.12 var(--display); letter-spacing: .3px; color: #fff; text-wrap: balance;
+}
+.strap { display: flex; margin: 0 -18px 0 -22px; font: 800 14px/1 var(--display); letter-spacing: 1.5px; text-transform: uppercase; }
+.strap .tag { display: inline-flex; align-items: center; gap: 6px; padding: 10px 12px 10px 14px; background: var(--red); color: #fff; flex: none; }
+.mic { width: 15px; height: 15px; display: inline-block; flex: none; }
+.mic svg { width: 100%; height: 100%; display: block; }
+.strap .name { flex: 1; padding: 10px 14px; background: var(--led); color: #231a00; overflow-wrap: anywhere; }
+.qtimer { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: #fff; opacity: .85; transform-origin: left; transform: scaleX(0); }
+.qwrap.running .qtimer { animation: qtime 5s linear forwards; }
+@keyframes qtime { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Lille knap, når citatet er skjult */
+.qpill { display: none; align-items: center; gap: 6px; border: 0; cursor: pointer; background: var(--red); color: #fff; font: 800 13px/1 var(--display); letter-spacing: 1.5px; text-transform: uppercase; padding: 7px 12px 7px 10px; border-radius: 999px; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
+.qwrap.closed .quote { display: none; }
+.qwrap.closed .qpill { display: inline-flex; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .qwrap.running .quote { animation: qin .45s cubic-bezier(.2,1.3,.4,1); }
+  .qwrap.running .strap { animation: strapIn .55s cubic-bezier(.2,.9,.3,1) both .15s; }
+  .qwrap.closing .quote { animation: qout .35s ease-in forwards; }
+}
+@keyframes qin { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes strapIn { from { transform: translateX(-104%); } to { transform: none; } }
+@keyframes qout { to { transform: translateY(8px) scale(.92); opacity: 0; } }
+
+/* Placeringer */
+.q-board { margin: 14px 0 2px; }
+.q-board.closed, .q-pitch.closed, .q-free.closed { text-align: center; }
+.q-league { margin: 18px 0 6px; }
+.q-free { margin: 18px 0 0; }
+.q-free blockquote { font-size: 25px; }
+.q-pitch { margin: 12px 0 2px; }
+.q-pitch .quote { background: linear-gradient(135deg, rgba(15,35,24,.95), rgba(7,16,9,.95)); }
+.q-pitch blockquote { font-size: 21px; }
+.winner .qwrap { grid-column: 1 / -1; }
+.q-in-dark { margin: 14px 0 4px; }
+.quote-card h3 { margin: 0 0 10px; }
+.q-paper { margin: 0; }
+.q-paper blockquote { font-size: 25px; }
