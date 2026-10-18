@@ -456,3 +456,17 @@ table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
 .h2hlist li { display: flex; gap: 10px; }
 .h2hlist .hd { color: rgba(255,255,255,.5); min-width: 92px; }
 @media (max-width: 400px) { nav.tabs button { padding: 10px 11px; font-size: 16px; } }
+
+/* Færdigspillet kamp: resultatet stort i midten, dit tip mindre nedenunder */
+.tip .slut { display: none; }
+.done .tip .slut {
+  display: block; position: absolute; left: 50%; top: -32px; transform: translateX(-50%);
+  font: 800 13px/1 var(--display); letter-spacing: 2.5px; text-transform: uppercase;
+  background: var(--chalk); color: var(--grass-deep); padding: 5px 10px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+.done .digit { width: 64px; height: 74px; font-size: 48px; }
+.mytip { display: inline-flex; align-items: center; gap: 8px; background: rgba(4,14,8,.62); padding: 5px 12px; border-radius: 999px; }
+.mytip .lbl { font: 700 12px var(--body); letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.75); }
+.mytip b { font: 800 17px var(--display); letter-spacing: .5px; color: #fff; }
+.mytip.none b { color: rgba(255,255,255,.6); font-size: 15px; }
+@media (max-width: 420px) { .done .digit { width: 56px; height: 66px; font-size: 42px; } }

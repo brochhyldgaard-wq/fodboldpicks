@@ -350,7 +350,7 @@ function matchCard(m) {
     h("div", { class: "mmid" },
       h("div", { class: "circle", "aria-hidden": "true" }),
       h("div", { class: "team" }, crest(m.home_crest, m.home), h("span", { text: m.home })),
-      h("div", { class: "tip" }, hw.el, h("span", { class: "colon", "aria-hidden": "true" }, ":"), aw.el,
+      h("div", { class: "tip" }, h("span", { class: "slut", "aria-hidden": "true" }, "Slut"), hw.el, h("span", { class: "colon", "aria-hidden": "true" }, ":"), aw.el,
         h("div", { class: "digits", "aria-label": "Dit tip" }, dh, h("span", { class: "colon", "aria-hidden": "true" }, ":"), da)),
       h("div", { class: "team" }, crest(m.away_crest, m.away), h("span", { text: m.away }))),
     h("div", { class: "final" }),
@@ -443,12 +443,17 @@ function refreshCard(card) {
   const st = started(m), mine = S.myTips.get(m.id) || null;
   $(".time", card).textContent = fmtTime(m.kickoff);
   card.classList.toggle("locked", st);
+  const done = isDone(m);
+  card.classList.toggle("done", done);
 
   // hjul: opdater kun, hvis brugeren ikke lige har rørt dem
   const idle = Date.now() - Math.max(card._hw.touched, card._aw.touched) > 4000;
   if (!st && idle) { card._hw.set(mine ? mine.home : null); card._aw.set(mine ? mine.away : null); }
   card._hw.disable(st); card._aw.disable(st);
-  for (const [d, v] of [[card._dh, mine?.home], [card._da, mine?.away]]) {
+  // efter slutfløjt viser tavlen kampens resultat, ellers dit tip
+  const shown = done ? { home: m.home_goals, away: m.away_goals } : mine;
+  card.querySelector(".digits").setAttribute("aria-label", done ? `Slutresultat ${m.home_goals}–${m.away_goals}` : "Dit tip");
+  for (const [d, v] of [[card._dh, shown?.home], [card._da, shown?.away]]) {
     d.textContent = v == null ? "–" : String(v);
     d.classList.toggle("empty", v == null);
   }
@@ -458,13 +463,15 @@ function refreshCard(card) {
   const p = points(mine, m);
   if (isDone(m)) status.append(p === 100 ? h("span", { class: "pts p100" }, ball("ball sm"), "Ciffer! 100 p") : h("span", { class: "pts p" + p, text: p === 20 ? "Udfald 20 p" : "0 p" }));
   else if (OFF.includes(m.status)) status.append(h("span", { text: "Udsat" }));
-  else if (isLive(m) || (st && !isDone(m))) status.append(h("span", { class: "live", text: isLive(m) && m.home_goals != null ? `Live ${m.home_goals}–${m.away_goals}` : "Kampen er i gang" }));
+  else if (isLive(m) && m.home_goals != null) status.append(h("span", { class: "live", text: `Live ${m.home_goals}–${m.away_goals}` }));
+  else if (st && Date.now() - new Date(m.kickoff).getTime() > 150 * 60000) status.append(h("span", { text: "Afventer resultat" }));
+  else if (st) status.append(h("span", { class: "live", text: "Kampen er i gang" }));
   else if (card._msg && Date.now() - card._msg.at < 3000) status.append(h("span", { class: card._msg.kind, text: card._msg.text }));
   else if (!mine) status.append(h("span", { text: "Mangler tip" }));
   else status.append(h("span", { class: "ok", text: "Tippet" }));
 
   const fin = $(".final", card); fin.innerHTML = "";
-  if (isDone(m)) fin.append(h("span", { class: "ft" }, "Slut"), h("span", { class: "led", text: `${m.home_goals}–${m.away_goals}` }));
+  if (done) fin.append(h("span", { class: "mytip" + (mine ? "" : " none") }, h("span", { class: "lbl", text: "Dit tip" }), h("b", { text: mine ? `${mine.home}–${mine.away}` : "intet tip" })));
   else if (st) fin.append(h("span", { class: "muted-light", text: "Dit tip er låst" }));
   setQuote($(".mquote", card), p === 100 ? quote("ciffertip", m.id) : null, "q-pitch", "ciffer:" + m.id);
 
