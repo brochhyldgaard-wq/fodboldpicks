@@ -15,7 +15,7 @@ export default async (req) => {
     if (!p?.is_admin) return Response.json({ error: "Kun administratoren kan hente kampe" }, { status: 403 });
     const count = await syncMatches(sb);
     let extra = null, extraError = null;
-    try { extra = await syncExtra(sb, 4); } catch (e) { extraError = e.message || String(e); }
+    try { extra = await syncExtra(sb); } catch (e) { extraError = e.message || String(e); }
     return Response.json({ ok: true, count, extra, extraError });
   } catch (e) {
     return Response.json({ error: e.message || String(e) }, { status: 500 });

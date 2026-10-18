@@ -470,3 +470,4 @@ table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
 .mytip b { font: 800 17px var(--display); letter-spacing: .5px; color: #fff; }
 .mytip.none b { color: rgba(255,255,255,.6); font-size: 15px; }
 @media (max-width: 420px) { .done .digit { width: 56px; height: 66px; font-size: 42px; } }
+.pvform { margin: 0 0 6px; font-size: 12px; color: rgba(255,255,255,.55); }
