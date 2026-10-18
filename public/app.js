@@ -189,6 +189,11 @@ async function loadAll() {
   ]);
   for (const r of [pl, ma, mt, rs, rst]) if (r.error) throw r.error;
   S.players = pl.data; S.matches = ma.data; S.roundScores = rs.data; S.roundStatus = rst.data;
+  const [st, sc] = await Promise.all([
+    S.sb.from("pl_standings").select("*").order("position"),
+    S.sb.from("pl_scorers").select("*").order("rank"),
+  ]);
+  S.plTable = st.error ? null : st.data; S.plScorers = sc.error ? [] : sc.data;
   S.myTips = new Map(mt.data.map((t) => [t.match_id, { home: t.home, away: t.away }]));
   S.me = S.players.find((p) => p.user_id === id) || null;
 }
@@ -202,7 +207,7 @@ async function loadRoundTips() {
 
 async function refresh() {
   try { await loadAll(); await loadRoundTips(); } catch (e) { return; }
-  if (S.view === "kampe") refreshRows(); else render();
+  if (S.view === "kampe") refreshRows(); else if (S.view !== "pl") render(); // PL-fanen gentegnes ikke, så åbne previews bliver stående
 }
 
 function defaultRound() {
@@ -291,6 +296,7 @@ function render() {
   const main = $("#main"); main.innerHTML = "";
   if (S.view === "kampe") renderRound(main);
   else if (S.view === "stilling") renderStandings(main);
+  else if (S.view === "pl") renderPL(main);
   else renderMore(main);
 }
 
@@ -709,6 +715,111 @@ function renderProgress(main) {
   main.append(card);
 }
 
+// ---------- Premier League: tabel, næste runde med preview og topscorere ----------
+function teamForm(team, n = 5) {
+  return S.matches.filter((m) => isDone(m) && (m.home === team || m.away === team))
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff)).slice(-n)
+    .map((m) => { const my = m.home === team ? m.home_goals : m.away_goals, th = m.home === team ? m.away_goals : m.home_goals; return my > th ? "V" : my < th ? "T" : "U"; });
+}
+const formEl = (f) => h("span", { class: "form" }, f.length ? f.map((r) => h("span", { class: "fr f-" + r, title: { V: "Sejr", U: "Uafgjort", T: "Nederlag" }[r], text: r })) : h("span", { class: "muted-dark", text: "Ingen kampe endnu" }));
+const tcrest = (url, name, size = 22) => url ? h("img", { src: url, alt: "", width: String(size), height: String(size), loading: "lazy", class: "tcrest" }) : h("span", { class: "tcrest blank", text: name.slice(0, 1) });
+function nextRound() {
+  const now = Date.now();
+  const up = S.matches.filter((m) => !OFF.includes(m.status) && !isDone(m) && new Date(m.kickoff).getTime() > now).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  return up.length ? up[0].round : null;
+}
+
+async function renderPL(main) {
+  // Tabel
+  const t = S.plTable;
+  const tableCard = h("div", { class: "card table-card pl-card" }, h("div", { class: "league-head" }, h("h2", { text: "Premier League" }), h("span", { class: "sub", text: "Stillingen" })));
+  if (!t || !t.length) {
+    tableCard.append(h("p", { class: "muted-dark", text: t === null
+      ? "Tabellen mangler i databasen. Administratoren skal køre premier-league.sql i Supabase."
+      : "Tabellen hentes automatisk hver time. Administratoren kan hente den nu under Mere." }));
+  } else {
+    const n = t.length;
+    const body = h("tbody", {}, t.map((r) => h("tr", { class: r.position > n - 3 ? "z-releg-pl" : "" },
+      h("td", { class: "pos", text: r.position }),
+      h("td", { class: "club l" }, h("span", { class: "tcell" }, tcrest(r.crest, r.team), h("span", { text: r.team }))),
+      h("td", { text: r.played }), h("td", { text: r.won }), h("td", { text: r.draw }), h("td", { text: r.lost }),
+      h("td", { text: (r.goal_diff > 0 ? "+" : "") + r.goal_diff }),
+      h("td", { class: "total", text: r.points }))));
+    tableCard.append(h("div", { class: "tablewrap" }, h("table", { class: "pl" },
+      h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", { class: "l" }, "Hold"), h("th", { title: "Kampe" }, "K"), h("th", { title: "Vundne" }, "V"), h("th", { title: "Uafgjorte" }, "U"), h("th", { title: "Tabte" }, "T"), h("th", { title: "Målforskel" }, "+/-"), h("th", {}, "P"))),
+      body)));
+    tableCard.append(h("div", { class: "legend" }, h("span", { class: "key releg" }, "Nedrykning")));
+  }
+  main.append(tableCard);
+
+  // Næste runde med preview
+  const r = nextRound();
+  const rc = h("div", { class: "card preview-card" });
+  main.append(rc);
+  if (r == null) { rc.append(h("h2", { text: "Næste runde" }), h("p", { class: "muted-dark", text: "Sæsonen er færdigspillet." })); }
+  else {
+    const ms = S.matches.filter((m) => m.round === r && !OFF.includes(m.status) && new Date(m.kickoff).getTime() > Date.now()).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+    rc.append(h("div", { class: "league-head" }, h("h2", { text: `Næste runde` }), h("span", { class: "sub", text: `Runde ${r}` })));
+    const { data: h2h } = await S.sb.from("pl_h2h").select("match_id, data").in("match_id", ms.map((m) => m.id));
+    const H = new Map((h2h || []).map((x) => [x.match_id, x.data]));
+    const pos = new Map((S.plTable || []).map((x) => [x.team, x]));
+    let lastDay = "";
+    for (const m of ms) {
+      const d = fmtDay(m.kickoff);
+      if (d !== lastDay) { rc.append(h("p", { class: "pday", text: d })); lastDay = d; }
+      const tipped = S.myTips.has(m.id);
+      const panel = h("div", { class: "pv", hidden: true });
+      const btn = h("button", { class: "pvbtn", "aria-expanded": "false", onclick: () => {
+        const open = panel.hidden; panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); btn.classList.toggle("on", open);
+      } }, "Preview");
+      const row = h("div", { class: "pmatch" },
+        h("div", { class: "prow" },
+          h("span", { class: "ptime", text: fmtTime(m.kickoff) }),
+          h("span", { class: "pteams" }, h("span", { class: "pt" }, tcrest(m.home_crest, m.home, 20), h("b", { text: m.home })), h("span", { class: "pt" }, tcrest(m.away_crest, m.away, 20), h("b", { text: m.away }))),
+          h("span", { class: "ptip " + (tipped ? "ok" : "miss"), text: tipped ? "Tippet" : "Mangler tip" })),
+        h("div", { class: "prow2" }, btn),
+        panel);
+      // preview-indhold
+      const side = (team) => {
+        const p = pos.get(team);
+        return h("div", { class: "pvside" },
+          h("p", { class: "pvteam", text: team }),
+          h("p", { class: "pvpos", text: p ? `${p.position}. plads, ${p.points} point` : "Placering ukendt" }),
+          formEl(teamForm(team)));
+      };
+      panel.append(h("div", { class: "pvgrid" }, side(m.home), side(m.away)));
+      const hh = H.get(m.id);
+      const box = h("div", { class: "h2h" }, h("p", { class: "pvlabel", text: "Indbyrdes opgør" }));
+      if (!hh) box.append(h("p", { class: "muted-dark", text: "Hentes automatisk inden for et par timer." }));
+      else if (!hh.n) box.append(h("p", { class: "muted-dark", text: "Holdene har ikke mødt hinanden i de seneste sæsoner." }));
+      else {
+        const hw = hh.homeWins ?? 0, aw = hh.awayWins ?? 0, dr = hh.draws ?? Math.max(0, hh.n - hw - aw);
+        const pct = (x) => `${Math.round((x / Math.max(1, hw + dr + aw)) * 100)}%`;
+        box.append(
+          h("p", { class: "h2hsum", text: `Seneste ${hh.n} opgør${hh.goals != null ? `, ${hh.goals} mål i alt` : ""}` }),
+          h("div", { class: "h2hbar", role: "img", "aria-label": `${m.home} ${hw} sejre, ${dr} uafgjort, ${m.away} ${aw} sejre` },
+            h("span", { class: "hb-h", style: `width:${pct(hw)}` }), h("span", { class: "hb-d", style: `width:${pct(dr)}` }), h("span", { class: "hb-a", style: `width:${pct(aw)}` })),
+          h("div", { class: "h2hkeys" },
+            h("span", {}, h("b", { text: hw }), ` ${m.home}`), h("span", {}, h("b", { text: dr }), " uafgjort"), h("span", {}, h("b", { text: aw }), ` ${m.away}`)),
+          h("ul", { class: "h2hlist" }, (hh.last || []).slice(0, 3).map((x) => h("li", {},
+            h("span", { class: "hd", text: new Date(x.date).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) }),
+            h("span", { text: `${x.home} ${x.hg}–${x.ag} ${x.away}` })))));
+      }
+      panel.append(box);
+      rc.append(row);
+    }
+  }
+
+  // Topscorere, hvis de er tilgængelige
+  if (S.plScorers && S.plScorers.length) {
+    main.append(h("div", { class: "card table-card minor" }, h("h2", { text: "Topscorere" }),
+      h("div", { class: "tablewrap" }, h("table", {},
+        h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", { class: "l" }, "Spiller"), h("th", { class: "l" }, "Hold"), h("th", {}, "Mål"))),
+        h("tbody", {}, S.plScorers.map((x) => h("tr", {},
+          h("td", { class: "pos", text: x.rank }), h("td", { class: "name l", text: x.player }), h("td", { class: "l", text: x.team || "" }), h("td", { class: "total", text: x.goals }))))))));
+  }
+}
+
 // ---------- Regler og mere ----------
 function renderMore(main) {
   main.append(h("div", { class: "card" },
@@ -800,7 +911,7 @@ function adminCard() {
         const r = await fetch("/api/sync", { method: "POST", headers: { authorization: "Bearer " + S.session.access_token } });
         const j = await r.json().catch(() => ({}));
         e.target.disabled = false;
-        toast(r.ok ? `${j.count} kampe hentet` : j.error || "Kampene kunne ikke hentes");
+        toast(r.ok ? `${j.count} kampe hentet${j.extra ? `, tabel med ${j.extra.standings} hold, ${j.extra.h2h} indbyrdes opgør` : ""}${j.extraError ? ". Premier League-data: " + j.extraError : ""}` : j.error || "Kampene kunne ikke hentes");
         if (r.ok) { S.round = null; await loadAll(); S.round = defaultRound(); await loadRoundTips(); }
       } }, "Hent kampe nu")),
     h("label", { for: "admtoggle", class: "check" }, toggle, h("span", { text: "Vis felter til manuelle resultater under Kampe" })),

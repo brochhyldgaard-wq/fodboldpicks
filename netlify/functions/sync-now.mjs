@@ -1,6 +1,7 @@
 // Kaldes fra appen, når administratoren trykker "Hent kampe nu".
 import { adminClient } from "../lib/supabase.mjs";
 import { syncMatches } from "../lib/sync.mjs";
+import { syncExtra } from "../lib/extra.mjs";
 
 export default async (req) => {
   if (req.method !== "POST") return new Response("Brug POST", { status: 405 });
@@ -13,7 +14,9 @@ export default async (req) => {
     const { data: p } = await sb.from("players").select("is_admin").eq("user_id", user.id).maybeSingle();
     if (!p?.is_admin) return Response.json({ error: "Kun administratoren kan hente kampe" }, { status: 403 });
     const count = await syncMatches(sb);
-    return Response.json({ ok: true, count });
+    let extra = null, extraError = null;
+    try { extra = await syncExtra(sb, 4); } catch (e) { extraError = e.message || String(e); }
+    return Response.json({ ok: true, count, extra, extraError });
   } catch (e) {
     return Response.json({ error: e.message || String(e) }, { status: 500 });
   }

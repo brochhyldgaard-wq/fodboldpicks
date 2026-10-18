@@ -402,3 +402,57 @@ tr.me td.name { font-weight: 800; }
 .quote-card h3 { margin: 0 0 10px; }
 .q-paper { margin: 0; }
 .q-paper blockquote { font-size: 25px; }
+
+/* ---------- Premier League-fanen ---------- */
+.card.pl-card, .card.preview-card { color: var(--chalk); background: rgba(10,18,13,.92); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border: 1px solid #26382c; }
+.pl-card h2, .preview-card h2 { margin: 0; font-size: 32px; color: #fff; }
+.pl-card .sub, .preview-card .sub { font: 700 12px var(--body); letter-spacing: 2px; text-transform: uppercase; color: var(--led); }
+.muted-dark { color: rgba(255,255,255,.65); }
+table.pl thead tr { background: #040a06; }
+table.pl td { color: var(--chalk); border-bottom-color: #22362a; font-size: 17px; padding: 9px 4px; }
+table.pl th { padding-left: 4px; padding-right: 4px; }
+table.pl td.pos { color: rgba(255,255,255,.55); width: 28px; font-size: 16px; }
+table.pl td.club { font: 600 15px var(--body); white-space: nowrap; }
+.tcell { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+table.pl td.total { font-size: 21px; color: var(--led); }
+table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
+.pl-card .legend { color: rgba(255,255,255,.6); }
+.tcrest { width: 22px; height: 22px; object-fit: contain; flex: none; border-radius: 50%; background: #fff; padding: 2px; }
+.tcrest.blank { display: inline-grid; place-items: center; font: 800 12px var(--display); color: #1f6a33; }
+.pday { margin: 16px 0 6px; font: 800 14px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.6); }
+.pmatch { padding: 10px 0; border-bottom: 1px solid #22362a; }
+.prow { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; }
+.ptime { font: 800 16px var(--display); color: rgba(255,255,255,.7); }
+.pteams { display: grid; gap: 4px; min-width: 0; }
+.pt { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pteams b { font: 700 17px var(--display); letter-spacing: .3px; }
+.pteams .vs { color: rgba(255,255,255,.5); }
+.ptip { font: 800 12px var(--display); letter-spacing: 1px; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.ptip.ok { background: rgba(93,214,139,.18); color: #8ff0b0; }
+.ptip.miss { background: rgba(255,75,62,.18); color: #ffb4ad; }
+.prow2 { margin: 8px 0 0 56px; }
+.pvbtn { font: 800 13px var(--display); letter-spacing: 1.5px; text-transform: uppercase; background: transparent; color: var(--led); border: 1.5px solid var(--led); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.pvbtn::after { content: " ▾"; }
+.pvbtn.on { background: var(--led); color: #231a00; }
+.pvbtn.on::after { content: " ▴"; }
+.pv { margin: 12px 0 4px; padding: 14px; border-radius: 12px; background: #050b07; border: 1px solid #22362a; }
+.pvgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pvteam { margin: 0; font: 800 18px var(--display); }
+.pvpos { margin: 2px 0 8px; font-size: 13px; color: rgba(255,255,255,.65); }
+.form { display: flex; gap: 4px; flex-wrap: wrap; }
+.fr { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font: 800 13px var(--display); }
+.f-V { background: #2fbf63; color: #062611; }
+.f-U { background: #9aa6a0; color: #10170f; }
+.f-T { background: var(--red); color: #fff; }
+.h2h { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #2a4033; }
+.pvlabel { margin: 0 0 6px; font: 800 13px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--led); }
+.h2hsum { margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,.75); }
+.h2hbar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #1a2b21; }
+.hb-h { background: var(--led); } .hb-d { background: #9aa6a0; } .hb-a { background: #6fcbff; }
+.h2hkeys { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 13px; color: rgba(255,255,255,.75); }
+.h2hkeys b { font: 800 16px var(--display); color: #fff; }
+.h2hkeys span:first-child b { color: var(--led); } .h2hkeys span:last-child b { color: #6fcbff; }
+.h2hlist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.h2hlist li { display: flex; gap: 10px; }
+.h2hlist .hd { color: rgba(255,255,255,.5); min-width: 92px; }
+@media (max-width: 400px) { nav.tabs button { padding: 10px 11px; font-size: 16px; } }

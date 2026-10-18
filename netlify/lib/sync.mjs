@@ -5,7 +5,7 @@ const NAMES = {
   "Nottingham": "Nottm Forest",
   "Wolverhampton": "Wolves",
 };
-const teamName = (t) => NAMES[t?.shortName] || t?.shortName || t?.name || "Ukendt";
+export const teamName = (t) => NAMES[t?.shortName] || t?.shortName || t?.name || "Ukendt";
 
 export async function syncMatches(sb) {
   const token = process.env.FOOTBALL_DATA_TOKEN;
