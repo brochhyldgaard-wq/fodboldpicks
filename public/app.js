@@ -1144,7 +1144,7 @@ function adminCard() {
         const r = await fetch("/api/sync", { method: "POST", headers: { authorization: "Bearer " + S.session.access_token } });
         const j = await r.json().catch(() => ({}));
         e.target.disabled = false;
-        toast(r.ok ? `${j.count} kampe hentet${j.extra ? `, tabel med ${j.extra.standings} hold` : ""}${j.extraError ? ". Premier League-data: " + j.extraError : ""}` : j.error || "Kampene kunne ikke hentes");
+        toast(r.ok ? `${j.count} kampe hentet${j.extra ? `, tabel med ${j.extra.standings} hold` : ""}${j.extraError ? ". Premier League-data: " + j.extraError : ""}${j.fallback && j.fallback.filled ? `. ${j.fallback.filled} resultater fra reservekilden` : ""}${j.fallbackError ? ". Reservekilde: " + j.fallbackError : ""}` : j.error || "Kampene kunne ikke hentes");
         if (r.ok) { S.round = null; await loadAll(); S.round = defaultRound(); await loadRoundTips(); }
       } }, "Hent kampe nu")),
     h("label", { for: "admtoggle", class: "check" }, toggle, h("span", { text: "Vis felter til manuelle resultater under Kampe" })),
