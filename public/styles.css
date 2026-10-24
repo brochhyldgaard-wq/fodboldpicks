@@ -504,3 +504,30 @@ table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
 .cleft { font: 700 12px var(--body); color: rgba(255,255,255,.55); min-width: 18px; text-align: right; }
 .csend { font: 800 14px var(--display); letter-spacing: 1px; text-transform: uppercase; background: var(--led); color: #231a00; border: 0; border-radius: 999px; padding: 10px 14px; cursor: pointer; }
 .csend:disabled { opacity: .5; }
+
+/* Snak om stillingen */
+.card.talk-card { color: var(--chalk); background: rgba(10,18,13,.92); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border: 1px solid #26382c; }
+.talk-card h2 { margin: 0; font-size: 28px; color: #fff; }
+.talk-card .sub { font: 700 12px var(--body); letter-spacing: 2px; text-transform: uppercase; color: var(--led); }
+.cbox.topic { margin: 4px 0 0; padding: 0; background: none; border: 0; }
+.cbox.topic .clist { max-height: 380px; }
+
+/* ---------- Debat under stillingen ---------- */
+.card.talk { color: var(--chalk); background: rgba(10,18,13,.9); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border: 1px solid #26382c; }
+.talk h2 { margin: 0; font-size: 28px; color: #fff; }
+.talk .sub { font: 700 12px var(--body); letter-spacing: 1.5px; text-transform: uppercase; color: var(--led); }
+.tform { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.talk input.tinput { flex: 1; min-width: 0; font: 500 16px var(--body); padding: 11px 14px; border-radius: 999px; border: 2px solid #2b4033; background: #0a120d; color: #fff; }
+.talk input.tinput:focus { border-color: var(--led); outline: none; }
+#talklist { display: flex; flex-direction: column; gap: 14px; }
+.tthread { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px dashed #2a4033; }
+.tthread:last-child { border-bottom: 0; padding-bottom: 0; }
+.bubble.troot { max-width: 92%; }
+.bubble.troot .btext { font-size: 16px; }
+.treplies { display: flex; flex-direction: column; gap: 6px; margin-left: 18px; padding-left: 12px; border-left: 2px solid #2b4033; }
+.bubble.treply { max-width: 88%; padding: 6px 10px 7px; }
+.bubble.treply .btext { font-size: 14px; }
+.tfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-left: 2px; }
+.texp { font-size: 12px; color: rgba(255,255,255,.5); }
+.treplybtn { background: none; border: 1.5px solid var(--led); color: var(--led); font: 800 12px var(--display); letter-spacing: 1px; text-transform: uppercase; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.treplyform { margin: 2px 0 0 30px; }

@@ -177,6 +177,7 @@ async function start() {
   await loadRoundTips();
   render();
   subscribeComments();
+  subscribeTalk();
 }
 
 async function loadAll() {
@@ -209,7 +210,7 @@ async function loadRoundTips() {
 
 async function refresh() {
   try { await loadAll(); await loadRoundTips(); } catch (e) { return; }
-  if (S.view === "kampe") refreshRows(); else if (S.view !== "pl") render(); // PL-fanen gentegnes ikke, så åbne previews bliver stående
+  if (S.view === "kampe") refreshRows(); else if (S.view === "stilling" && talkBusy()) { /* lad være med at gentegne, mens nogen skriver */ } else if (S.view !== "pl") render(); // PL-fanen gentegnes ikke, så åbne previews bliver stående
 }
 
 function defaultRound() {
@@ -358,7 +359,7 @@ function matchCard(m) {
     h("div", { class: "final" }),
     h("div", { class: "mquote" }),
     h("div", { class: "others" }),
-    commentBox(m),
+    commentBox({ key: m.id, match: m }),
     S.admin && S.me.is_admin ? adminPanel(m) : null);
   card._m = m; card._hw = hw; card._aw = aw; card._dh = dh; card._da = da; card._msg = null;
   return card;
@@ -478,7 +479,7 @@ function refreshCard(card) {
   else if (st) fin.append(h("span", { class: "muted-light", text: "Dit tip er låst" }));
   setQuote($(".mquote", card), p === 100 ? quote("ciffertip", m.id) : null, "q-pitch", "ciffer:" + m.id);
 
-  updateCommentBox(card);
+  updateCommentBox($(".cbox", card));
   // andres tips fra kampstart
   const others = $(".others", card); others.innerHTML = "";
   others.hidden = !st;
@@ -611,6 +612,14 @@ function renderStandings(main) {
       table.length >= 4 ? h("span", { class: "key releg" }, "Nedrykningsstreg") : null),
     h("p", { class: "muted", style: "margin-top:10px", text: "Ved pointlighed afgør flest rigtige cifre, derefter flest runde-sejre. Runde-sejre tælles, når alle rundens kampe er spillet." })));
 
+  // Snak om stillingen
+  const talk = h("div", { class: "card talk-card" }, h("div", { class: "league-head" }, h("h2", { text: "Snak om stillingen" }), h("span", { class: "sub", text: "For alle spillere" })));
+  main.append(talk);
+  const fill = () => { talk.querySelectorAll(".cbox").forEach((b) => b.remove()); talk.append(commentBox({ key: "topic:stilling", topic: "stilling", open: true })); };
+  if (S.comments.has("topic:stilling")) fill();
+  else loadTopic("stilling").then((ok) => { if (ok) fill(); else talk.remove(); });
+
+  main.append(talkCard());
   renderProgress(main);
 
   // Top 10 runder
@@ -726,28 +735,38 @@ function renderProgress(main) {
   main.append(card);
 }
 
-// ---------- Kommentarer: talebobler før, under og efter kampen ----------
+// ---------- Kommentarer: talebobler til kampe og til stillingen ----------
+// Hver tråd har en nøgle: kampens id, eller "topic:stilling" for sæsonstillingen.
 S.comments = new Map();
 const MAX_COMMENT = 140;
+const keyOf = (c) => c.match_id || "topic:" + c.topic;
 async function loadComments(ids) {
   if (!ids || !ids.length) return;
-  const { data, error } = await S.sb.from("comments").select("id, match_id, user_id, body, created_at").in("match_id", ids).order("created_at").limit(1000);
+  const { data, error } = await S.sb.from("comments").select("*").in("match_id", ids).order("created_at").limit(1000);
   if (error) { S.commentsOff = true; return; } // tabellen findes ikke endnu
   S.commentsOff = false;
   for (const id of ids) S.comments.set(id, []);
   for (const c of data) S.comments.get(c.match_id).push(c);
 }
+async function loadTopic(topic) {
+  const { data, error } = await S.sb.from("comments").select("*").eq("topic", topic).order("created_at", { ascending: false }).limit(200);
+  if (error) return false; // emne-kolonnen findes ikke endnu
+  S.comments.set("topic:" + topic, (data || []).reverse());
+  return true;
+}
+const boxesFor = (key) => document.querySelectorAll(`.cbox[data-ckey="${CSS.escape(key)}"]`);
 function addComment(c) {
-  const list = S.comments.get(c.match_id) || [];
+  const key = keyOf(c);
+  const list = S.comments.get(key) || [];
   if (list.some((x) => x.id === c.id)) return;
   list.push(c); list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  S.comments.set(c.match_id, list);
-  document.querySelectorAll(`.match[data-id="${c.match_id}"]`).forEach((card) => updateCommentBox(card, true));
+  S.comments.set(key, list);
+  boxesFor(key).forEach((box) => updateCommentBox(box, true));
 }
 function removeComment(id) {
-  for (const [mid, list] of S.comments) {
+  for (const [key, list] of S.comments) {
     const i = list.findIndex((x) => x.id === id);
-    if (i >= 0) { list.splice(i, 1); document.querySelectorAll(`.match[data-id="${mid}"]`).forEach((card) => updateCommentBox(card, true)); }
+    if (i >= 0) { list.splice(i, 1); boxesFor(key).forEach((box) => updateCommentBox(box, true)); }
   }
 }
 function subscribeComments() {
@@ -764,17 +783,23 @@ function phaseOf(c, m) {
   return ["Efter", "ph-after"];
 }
 const bubbleIcon = () => { const s = document.createElement("span"); s.className = "bicon"; s.setAttribute("aria-hidden", "true"); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>'; return s; };
-function commentBox(m) {
-  const box = h("div", { class: "cbox" });
+
+// target: { key, match } for en kamp eller { key, topic, open: true } for et emne
+function commentBox(target) {
+  const box = h("div", { class: "cbox" + (target.topic ? " topic" : ""), "data-ckey": target.key });
+  box._key = target.key; box._m = target.match || null;
   const toggle = h("button", { class: "ctoggle", type: "button", "aria-expanded": "false" }, bubbleIcon(), h("span", { class: "ccount" }));
   const thread = h("div", { class: "cthread", hidden: true }, h("div", { class: "clist", role: "log", "aria-live": "polite" }));
+  const setOpen = (open) => {
+    thread.hidden = !open; toggle.setAttribute("aria-expanded", String(open)); box.classList.toggle("open", open);
+    if (open) renderThread(box);
+  };
   toggle.addEventListener("click", () => {
-    const open = thread.hidden; thread.hidden = !open; toggle.setAttribute("aria-expanded", String(open));
-    box.classList.toggle("open", open);
-    if (open) { renderThread(box, m); const inp = $(".cinput", box); if (inp && matchMedia("(pointer:fine)").matches) inp.focus(); }
+    setOpen(thread.hidden);
+    const inp = $(".cinput", box); if (!thread.hidden && inp && matchMedia("(pointer:fine)").matches) inp.focus();
   });
   if (S.me) {
-    const inp = h("input", { class: "cinput", type: "text", maxlength: String(MAX_COMMENT), placeholder: "Skriv en kommentar", "aria-label": "Skriv en kommentar", enterkeyhint: "send" });
+    const inp = h("input", { class: "cinput", type: "text", maxlength: String(MAX_COMMENT), placeholder: target.topic ? "Skriv om stillingen" : "Skriv en kommentar", "aria-label": "Skriv en kommentar", enterkeyhint: "send" });
     const left = h("span", { class: "cleft", "aria-hidden": "true" });
     const send = h("button", { class: "csend", type: "submit", "aria-label": "Send" }, "Send");
     inp.addEventListener("input", () => { left.textContent = MAX_COMMENT - inp.value.length < 30 ? String(MAX_COMMENT - inp.value.length) : ""; });
@@ -782,7 +807,8 @@ function commentBox(m) {
       e.preventDefault();
       const body = inp.value.trim(); if (!body) return;
       send.disabled = true;
-      const { data, error } = await S.sb.from("comments").insert({ match_id: m.id, user_id: uid(), body }).select().single();
+      const row = target.topic ? { topic: target.topic, user_id: uid(), body } : { match_id: target.match.id, user_id: uid(), body };
+      const { data, error } = await S.sb.from("comments").insert(row).select().single();
       send.disabled = false;
       if (error) { toast(/Vent/.test(error.message) ? "Vent et øjeblik, før du skriver igen" : "Kommentaren blev ikke sendt"); return; }
       inp.value = ""; left.textContent = "";
@@ -792,36 +818,38 @@ function commentBox(m) {
     thread.append(form);
   }
   box.append(toggle, thread);
-  box._m = m;
+  if (target.open) setOpen(true);
+  updateCommentBox(box);
   return box;
 }
-function updateCommentBox(card, fresh) {
-  const box = $(".cbox", card); if (!box) return;
+function updateCommentBox(box, fresh) {
+  if (!box) return;
   box.hidden = !!S.commentsOff;
-  const list = S.comments.get(card._m.id) || [];
+  const list = S.comments.get(box._key) || [];
   const n = list.length;
-  $(".ccount", box).textContent = n ? `${n} ${n === 1 ? "kommentar" : "kommentarer"}` : "Kommentér";
-  const last = list[list.length - 1];
+  const isTopic = box.classList.contains("topic");
+  $(".ccount", box).textContent = n ? `${n} ${n === 1 ? "kommentar" : "kommentarer"}` : (isTopic ? "Ingen kommentarer endnu" : "Kommentér");
   box.classList.toggle("has", n > 0);
+  const last = list[n - 1];
   if (fresh && last && last.user_id !== uid() && $(".cthread", box).hidden) {
     box.classList.remove("ping"); void box.offsetWidth; box.classList.add("ping"); // lille blink ved ny kommentar
   }
-  if (!$(".cthread", box).hidden) renderThread(box, card._m);
+  if (!$(".cthread", box).hidden) renderThread(box);
 }
-function renderThread(box, m) {
-  const el = $(".clist", box); const list = S.comments.get(m.id) || [];
+function renderThread(box) {
+  const el = $(".clist", box); const list = S.comments.get(box._key) || []; const m = box._m;
   const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   el.innerHTML = "";
   if (!list.length) el.append(h("p", { class: "cempty", text: "Ingen kommentarer endnu. Skriv den første." }));
   const today = new Date().toDateString();
   for (const c of list) {
     const mine = c.user_id === uid();
-    const [ph, pcls] = phaseOf(c, m);
+    const ph = m ? phaseOf(c, m) : null;
     const d = new Date(c.created_at);
     const when = d.toDateString() === today ? fmtTime(d) : `${fmtShort(d)} ${fmtTime(d)}`;
     const canDel = mine || (S.me && S.me.is_admin);
     el.append(h("div", { class: "bubble" + (mine ? " mine" : "") },
-      h("div", { class: "bmeta" }, mine ? null : h("b", { text: nick(c.user_id) }), h("span", { class: "ph " + pcls, text: ph }), h("span", { class: "bt", text: when }),
+      h("div", { class: "bmeta" }, mine ? null : h("b", { text: nick(c.user_id) }), ph ? h("span", { class: "ph " + ph[1], text: ph[0] }) : null, h("span", { class: "bt", text: when }),
         canDel ? h("button", { class: "bdel", type: "button", "aria-label": "Slet kommentar", onclick: async () => {
           if (!confirm("Slet kommentaren?")) return;
           const { error } = await S.sb.from("comments").delete().eq("id", c.id);
@@ -830,6 +858,106 @@ function renderThread(box, m) {
       h("p", { class: "btext", text: c.body })));
   }
   if (atBottom || !el._seen) { el.scrollTop = el.scrollHeight; el._seen = true; }
+}
+
+// ---------- Debat under sæsonstillingen (tråde forsvinder efter 5 dage) ----------
+const TALK_MAX = 280, TALK_DAYS = 5;
+S.talk = null; S.talkOpenReply = null;
+async function loadTalk() {
+  const { data, error } = await S.sb.from("talk").select("id, parent_id, user_id, body, created_at").order("created_at").limit(500);
+  S.talkOff = !!error; S.talk = error ? [] : data;
+}
+function talkBusy() { return [...document.querySelectorAll(".talk input")].some((i) => i.value.trim() || i === document.activeElement); }
+function subscribeTalk() {
+  if (S.talkChannel || !S.sb.channel) return;
+  S.talkChannel = S.sb.channel("talk-live")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "talk" }, (p) => { if (S.talk && !S.talk.some((x) => x.id === p.new.id)) { S.talk.push(p.new); renderTalkList(); } })
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "talk" }, (p) => { if (S.talk && p.old) { S.talk = S.talk.filter((x) => x.id !== p.old.id && x.parent_id !== p.old.id); renderTalkList(); } })
+    .subscribe();
+}
+function expiresText(root) {
+  const left = new Date(root.created_at).getTime() + TALK_DAYS * 864e5 - Date.now();
+  if (left <= 0) return "Udløber nu";
+  const hrs = Math.ceil(left / 36e5);
+  if (hrs < 24) return `Forsvinder om ${hrs} ${hrs === 1 ? "time" : "timer"}`;
+  const d = Math.ceil(left / 864e5);
+  return `Forsvinder om ${d} ${d === 1 ? "dag" : "dage"}`;
+}
+function talkWhen(iso) {
+  const d = new Date(iso), today = new Date().toDateString();
+  return d.toDateString() === today ? fmtTime(d) : `${fmtShort(d)} ${fmtTime(d)}`;
+}
+async function postTalk(body, parentId, btn) {
+  btn.disabled = true;
+  const { data, error } = await S.sb.from("talk").insert({ user_id: uid(), body, parent_id: parentId || null }).select().single();
+  btn.disabled = false;
+  if (error) { toast(/Vent/.test(error.message) ? "Vent et øjeblik, før du skriver igen" : /udløbet|findes ikke/.test(error.message) ? "Tråden er udløbet" : "Indlægget blev ikke sendt"); return false; }
+  if (!S.talk.some((x) => x.id === data.id)) S.talk.push(data);
+  renderTalkList(false);
+  return true;
+}
+function talkForm(placeholder, onSend, cls = "") {
+  const inp = h("input", { type: "text", class: "tinput", maxlength: String(TALK_MAX), placeholder, "aria-label": placeholder, enterkeyhint: "send" });
+  const btn = h("button", { class: "csend", type: "submit" }, "Send");
+  const left = h("span", { class: "cleft", "aria-hidden": "true" });
+  inp.addEventListener("input", () => { left.textContent = TALK_MAX - inp.value.length < 40 ? String(TALK_MAX - inp.value.length) : ""; });
+  return h("form", { class: "tform " + cls, onsubmit: async (e) => {
+    e.preventDefault(); const v = inp.value.trim(); if (!v) return;
+    if (await onSend(v, btn)) { inp.value = ""; left.textContent = ""; }
+  } }, inp, left, btn);
+}
+function talkBubble(c, isRoot) {
+  const mine = c.user_id === uid();
+  const canDel = mine || (S.me && S.me.is_admin);
+  return h("div", { class: "bubble" + (mine ? " mine" : "") + (isRoot ? " troot" : " treply") },
+    h("div", { class: "bmeta" }, h("b", { text: mine ? "Dig" : nick(c.user_id) }), h("span", { class: "bt", text: talkWhen(c.created_at) }),
+      canDel ? h("button", { class: "bdel", type: "button", "aria-label": "Slet", onclick: async () => {
+        if (!confirm(isRoot ? "Slet hele tråden?" : "Slet svaret?")) return;
+        const { error } = await S.sb.from("talk").delete().eq("id", c.id);
+        if (error) toast("Det blev ikke slettet");
+        else { S.talk = S.talk.filter((x) => x.id !== c.id && x.parent_id !== c.id); renderTalkList(); }
+      } }, "Slet") : null),
+    h("p", { class: "btext", text: c.body }));
+}
+function renderTalkList(keepDraft = true) {
+  const el = document.getElementById("talklist"); if (!el || !S.talk) return;
+  const openInp = el.querySelector(".treplyform input");
+  const draft = keepDraft && openInp ? openInp.value : "";   // bevar et påbegyndt svar
+  el.innerHTML = "";
+  const alive = (r) => new Date(r.created_at).getTime() > Date.now() - TALK_DAYS * 864e5;
+  const roots = S.talk.filter((x) => !x.parent_id && alive(x));
+  const replies = (id) => S.talk.filter((x) => x.parent_id === id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const lastAct = (r) => Math.max(new Date(r.created_at).getTime(), ...replies(r.id).map((x) => new Date(x.created_at).getTime()));
+  roots.sort((a, b) => lastAct(b) - lastAct(a)); // tråden med seneste aktivitet øverst
+  if (!roots.length) { el.append(h("p", { class: "cempty", text: "Ingen tråde lige nu. Start debatten om stillingen." })); return; }
+  for (const r of roots) {
+    const reps = replies(r.id);
+    const t = h("div", { class: "tthread" },
+      talkBubble(r, true),
+      reps.length ? h("div", { class: "treplies" }, reps.map((x) => talkBubble(x, false))) : null);
+    const foot = h("div", { class: "tfoot" }, h("span", { class: "texp", text: expiresText(r) }));
+    if (S.me) foot.append(h("button", { class: "treplybtn", type: "button", onclick: () => { S.talkOpenReply = S.talkOpenReply === r.id ? null : r.id; renderTalkList(); } },
+      S.talkOpenReply === r.id ? "Luk" : `Svar${reps.length ? ` (${reps.length})` : ""}`));
+    t.append(foot);
+    if (S.talkOpenReply === r.id) {
+      const f = talkForm("Skriv et svar", (v, btn) => postTalk(v, r.id, btn), "treplyform");
+      t.append(f);
+      requestAnimationFrame(() => { const i = f.querySelector("input"); if (draft) i.value = draft; if (matchMedia("(pointer:fine)").matches) i.focus(); });
+    }
+    el.append(t);
+  }
+}
+function talkCard() {
+  const card = h("div", { class: "card talk" },
+    h("div", { class: "league-head" }, h("h2", { text: "Snak om stillingen" }), h("span", { class: "sub", text: `Tråde forsvinder efter ${TALK_DAYS} dage` })));
+  const list = h("div", { id: "talklist" }, h("p", { class: "cempty", text: "Henter..." }));
+  if (S.me) card.append(talkForm("Start en ny tråd", (v, btn) => postTalk(v, null, btn), "tnew"));
+  card.append(list);
+  (S.talk ? Promise.resolve() : loadTalk()).then(() => {
+    if (S.talkOff) { card.hidden = true; return; } // debatten er ikke sat op i databasen endnu
+    renderTalkList();
+  });
+  return card;
 }
 
 // ---------- Premier League: tabel, næste runde med preview og topscorere ----------
