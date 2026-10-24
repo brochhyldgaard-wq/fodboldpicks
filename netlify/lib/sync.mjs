@@ -17,9 +17,11 @@ export async function syncMatches(sb) {
   if (!res.ok) throw new Error(`football-data.org svarede ${res.status}: ${await res.text()}`);
   const data = await res.json();
 
-  const { data: existing, error: exErr } = await sb.from("matches").select("id, manual");
+  const { data: existing, error: exErr } = await sb.from("matches").select("id, manual, status");
   if (exErr) throw exErr;
   const manual = new Set((existing || []).filter((r) => r.manual).map((r) => r.id));
+  // kampe, der allerede er afsluttet (for eksempel via reservekilden), må ikke blive uafsluttede igen
+  const done = new Set((existing || []).filter((r) => ["FINISHED", "AWARDED"].includes(r.status)).map((r) => r.id));
   const now = new Date().toISOString();
 
   const auto = [];
@@ -36,7 +38,7 @@ export async function syncMatches(sb) {
       kickoff: m.utcDate,
       updated_at: now,
     };
-    if (manual.has(base.id)) {
+    if (manual.has(base.id) || (done.has(base.id) && !["FINISHED", "AWARDED"].includes(m.status))) {
       fixedResult.push(base); // manuelt resultat: opdater kun tidspunkt og hold
     } else {
       auto.push({
