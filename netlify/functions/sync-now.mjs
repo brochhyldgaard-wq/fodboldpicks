@@ -2,6 +2,7 @@
 import { adminClient } from "../lib/supabase.mjs";
 import { syncMatches } from "../lib/sync.mjs";
 import { syncExtra } from "../lib/extra.mjs";
+import { fillMissingResults } from "../lib/fallback.mjs";
 
 export default async (req) => {
   if (req.method !== "POST") return new Response("Brug POST", { status: 405 });
@@ -16,7 +17,9 @@ export default async (req) => {
     const count = await syncMatches(sb);
     let extra = null, extraError = null;
     try { extra = await syncExtra(sb); } catch (e) { extraError = e.message || String(e); }
-    return Response.json({ ok: true, count, extra, extraError });
+    let fallback = null, fallbackError = null;
+    try { fallback = await fillMissingResults(sb, { force: true }); } catch (e) { fallbackError = e.message || String(e); }
+    return Response.json({ ok: true, count, extra, extraError, fallback, fallbackError });
   } catch (e) {
     return Response.json({ error: e.message || String(e) }, { status: 500 });
   }
