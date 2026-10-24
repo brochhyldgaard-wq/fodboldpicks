@@ -1,9 +1,12 @@
 // Kaldes af appen, når en spiller har skrevet en kommentar.
-// Sender en påmindelse til de andre, der har tippet kampen – højst én pr. kamp hvert 15. minut.
+// Kampkommentarer: besked til dem, der har tippet kampen, højst én pr. kamp hvert 15. minut.
+// Kommentarer til stillingen: besked til alle spillere, højst én hver halve time.
 import webpush from "web-push";
 import { adminClient } from "../lib/supabase.mjs";
 
 const QUIET_MIN = 15;
+const TOPIC_QUIET_MIN = 30;
+const TOPIC_TITLES = { stilling: "stillingen" };
 
 export default async (req) => {
   if (req.method !== "POST") return new Response("Brug POST", { status: 405 });
@@ -17,11 +20,13 @@ export default async (req) => {
     if (!user) return Response.json({ error: "Du er ikke logget ind" }, { status: 401 });
 
     const { comment_id } = await req.json().catch(() => ({}));
-    const { data: c } = await sb.from("comments").select("id, match_id, user_id, body, created_at").eq("id", comment_id).maybeSingle();
+    const { data: c } = await sb.from("comments").select("id, match_id, topic, user_id, body, created_at").eq("id", comment_id).maybeSingle();
     // kun forfatteren kan udløse påmindelsen, og kun lige efter kommentaren er skrevet
     if (!c || c.user_id !== user.id || Date.now() - new Date(c.created_at).getTime() > 2 * 60 * 1000) {
       return Response.json({ sent: 0 });
     }
+
+    if (c.topic) return Response.json(await notifyTopic(sb, c, user.id, { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT }));
 
     const [{ data: m }, { data: author }, { data: tippers }] = await Promise.all([
       sb.from("matches").select("home, away").eq("id", c.match_id).maybeSingle(),
@@ -69,5 +74,30 @@ export default async (req) => {
     return Response.json({ error: e.message || String(e) }, { status: 500 });
   }
 };
+
+async function notifyTopic(sb, c, authorId, keys) {
+  const since = new Date(Date.now() - TOPIC_QUIET_MIN * 60 * 1000).toISOString();
+  const [{ data: author }, { data: wants }, { data: recent }] = await Promise.all([
+    sb.from("players").select("nick").eq("user_id", authorId).maybeSingle(),
+    sb.from("players").select("user_id").eq("notify_comments", true).neq("user_id", authorId),
+    sb.from("topic_push_log").select("user_id").eq("topic", c.topic).gt("sent_at", since),
+  ]);
+  const skip = new Set((recent || []).map((r) => r.user_id));
+  const targets = (wants || []).map((w) => w.user_id).filter((id) => !skip.has(id));
+  if (!targets.length) return { sent: 0 };
+  const { data: subs } = await sb.from("push_subscriptions").select("*").in("user_id", targets);
+  webpush.setVapidDetails(keys.VAPID_SUBJECT || "mailto:admin@example.com", keys.VAPID_PUBLIC_KEY, keys.VAPID_PRIVATE_KEY);
+  const payload = JSON.stringify({ title: `${author?.nick || "En spiller"} om ${TOPIC_TITLES[c.topic] || c.topic}`, body: c.body, url: "/", tag: "t-" + c.topic });
+  let sent = 0;
+  for (const uid of targets) {
+    let ok = false;
+    for (const s of (subs || []).filter((x) => x.user_id === uid)) {
+      try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload); ok = true; }
+      catch (e) { if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().eq("endpoint", s.endpoint); }
+    }
+    if (ok) { sent++; await sb.from("topic_push_log").upsert({ user_id: uid, topic: c.topic, sent_at: new Date().toISOString() }); }
+  }
+  return { sent };
+}
 
 export const config = { path: "/api/comment-notify" };
