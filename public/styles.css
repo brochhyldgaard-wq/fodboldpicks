@@ -182,7 +182,7 @@ nav.tabs button[aria-current="page"] { color: var(--led); border-color: var(--le
 @keyframes spin { from { transform: rotate(-540deg); } to { transform: none; } }
 
 /* De andres tips: udskiftningsbænken */
-.others { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px -12px -14px; padding: 10px 12px 12px; background: rgba(4, 14, 8, .8); border-top: 2px solid rgba(255,255,255,.35); }
+.others { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px -12px 0; padding: 10px 12px 12px; background: rgba(4, 14, 8, .8); border-top: 2px solid rgba(255,255,255,.35); }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: #13241a; border: 1px solid #284033; font-size: 14px; color: var(--chalk); }
 .chip b { font: 800 16px var(--display); letter-spacing: .5px; }
 .chip i { font: 800 13px var(--display); font-style: normal; color: var(--chalk-dim); }
@@ -471,3 +471,36 @@ table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
 .mytip.none b { color: rgba(255,255,255,.6); font-size: 15px; }
 @media (max-width: 420px) { .done .digit { width: 56px; height: 66px; font-size: 42px; } }
 .pvform { margin: 0 0 6px; font-size: 12px; color: rgba(255,255,255,.55); }
+
+/* ---------- Kommentarer (talebobler) ---------- */
+.cbox { margin: 0 -12px -14px; padding: 8px 12px 10px; background: rgba(4,14,8,.86); border-top: 1px solid rgba(255,255,255,.12); }
+.others[hidden] + .cbox { margin-top: 12px; border-top: 2px solid rgba(255,255,255,.35); }
+.ctoggle { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; color: rgba(255,255,255,.8); font: 700 14px var(--body); cursor: pointer; padding: 4px 0; }
+.cbox.has .ctoggle { color: #fff; }
+.bicon { width: 18px; height: 18px; color: var(--led); display: inline-block; }
+.bicon svg { width: 100%; height: 100%; display: block; }
+.cbox.open .ctoggle .bicon { color: #fff; }
+@media (prefers-reduced-motion: no-preference) { .cbox.ping .bicon { animation: cping .9s ease-out 2; } }
+@keyframes cping { 30% { transform: scale(1.45) rotate(-8deg); } 60% { transform: scale(.95); } }
+.cthread { margin-top: 8px; }
+.clist { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding: 2px 2px 8px; overscroll-behavior: contain; }
+.cempty { margin: 4px 0; font-size: 14px; color: rgba(255,255,255,.6); }
+.bubble { position: relative; max-width: 84%; align-self: flex-start; background: #fff; color: #132a1c; border-radius: 4px 16px 16px 16px; padding: 8px 12px 9px; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.bubble.mine { align-self: flex-end; background: var(--led); color: #231a00; border-radius: 16px 4px 16px 16px; }
+.bmeta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; margin-bottom: 2px; }
+.bmeta b { font: 800 14px var(--display); letter-spacing: .3px; }
+.bt { color: rgba(19,42,28,.6); }
+.bubble.mine .bt { color: rgba(35,26,0,.65); }
+.ph { font: 800 10px/1 var(--display); letter-spacing: 1.2px; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; }
+.ph-before { background: #dfe7f5; color: #23406f; }
+.ph-live { background: var(--red); color: #fff; }
+.ph-after { background: #dce9df; color: #1f6a33; }
+.bubble.mine .ph-before, .bubble.mine .ph-after { background: rgba(35,26,0,.12); color: #231a00; }
+.btext { margin: 0; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.bdel { margin-left: auto; background: none; border: 0; padding: 0 0 0 6px; font: 600 12px var(--body); color: inherit; opacity: .6; text-decoration: underline; cursor: pointer; }
+.cform { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.cbox input.cinput { flex: 1; min-width: 0; font: 500 16px var(--body); padding: 10px 12px; border-radius: 999px; border: 2px solid #2b4033; background: #0a120d; color: #fff; }
+.cbox input.cinput:focus { border-color: var(--led); outline: none; }
+.cleft { font: 700 12px var(--body); color: rgba(255,255,255,.55); min-width: 18px; text-align: right; }
+.csend { font: 800 14px var(--display); letter-spacing: 1px; text-transform: uppercase; background: var(--led); color: #231a00; border: 0; border-radius: 999px; padding: 10px 14px; cursor: pointer; }
+.csend:disabled { opacity: .5; }
