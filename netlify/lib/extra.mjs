@@ -48,8 +48,11 @@ export async function syncScorers(sb) {
 }
 
 export async function syncExtra(sb) {
-  const out = { standings: 0, scorers: 0 };
+  const out = { standings: 0, scorers: 0, purged: 0 };
   out.standings = await syncStandings(sb);
   out.scorers = await syncScorers(sb);
+  // ryd udløbne tråde i debatten under stillingen (fejler stille, hvis debatten ikke er sat op)
+  const { data } = await sb.rpc("purge_talk");
+  out.purged = typeof data === "number" ? data : 0;
   return out;
 }
