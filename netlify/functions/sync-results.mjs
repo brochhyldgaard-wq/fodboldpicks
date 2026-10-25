@@ -13,8 +13,9 @@ export default async () => {
   }
   try {
     const r = await fillMissingResults(sb);
-    if (r.pending) console.log(`Reservekilde: ${r.pending} kampe mangler resultat, ${r.filled} hentet, ${r.calls} kald (${r.usedToday ?? "?"} i dag)${r.note ? ", " + r.note : ""}`);
     if (r.skipped) console.log("Reservekilde: " + r.skipped);
+    else if (r.pending) console.log(`Reservekilde: ${r.pending} kampe mangler resultat, ${r.filled} hentet, ${r.calls} kald (${r.usedToday ?? "?"} i dag)${r.note ? ", " + r.note : ""}`);
+    else console.log("Reservekilde: ingen kampe mangler resultat");
   } catch (e) {
     console.error("Reservekilde fejlede:", e.message || e);
   }
