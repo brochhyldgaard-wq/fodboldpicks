@@ -1,6 +1,7 @@
 /* Tipsligaen – Premier League-tipsspil */
 "use strict";
 
+const MAX_PLAYERS = 11; // et fodboldhold. Skal passe med grænsen i databasen
 const ROW = 44;        // højde på et tal i hjulet (px), skal matche --row i CSS
 const MAX_GOALS = 12;  // højeste tal på hjulet
 const DONE = ["FINISHED", "AWARDED"];
@@ -268,13 +269,13 @@ function oversaet(m) {
 function renderJoin(msg = "") {
   $("#tabs").hidden = true;
   const main = $("#main"); main.innerHTML = "";
-  const full = S.players.length >= 10;
+  const full = S.players.length >= MAX_PLAYERS;
   const nickIn = h("input", { type: "text", id: "nick", maxlength: "24", required: true, placeholder: "Dit navn i tabellen" });
   const code = h("input", { type: "text", id: "code", autocomplete: "off", required: true, placeholder: "Fra den, der inviterede dig" });
   const btn = h("button", { class: "btn flood", type: "submit" }, "Meld dig til");
   main.append(h("div", { class: "card" },
     h("h2", { text: full ? "Turneringen er fuld" : "Meld dig til" }),
-    h("p", { class: "muted", text: full ? "Der er allerede 10 spillere med. Du kan ikke melde dig til." : `${S.players.length} af 10 pladser er taget.` }),
+    h("p", { class: "muted", text: full ? `Der er allerede ${MAX_PLAYERS} spillere med. Du kan ikke melde dig til.` : `${S.players.length} af ${MAX_PLAYERS} pladser er taget.` }),
     msg ? h("p", { role: "alert", text: msg }) : null,
     full ? null : h("form", {
       onsubmit: async (e) => {
@@ -1055,7 +1056,7 @@ function renderMore(main) {
     h("h3", { text: "Point" }),
     h("p", { text: "Rigtigt ciffertip giver 100 point. Rigtigt udfald (hjemmesejr, uafgjort eller udesejr) giver 20 point. Forkert tip, intet tip eller en kamp, der ikke spilles, giver 0 point." }),
     h("h3", { text: "Turneringen" }),
-    h("p", { text: "Højst 10 spillere. Tabellen tæller hele sæsonen. Rundens vinder er den med flest point i en færdigspillet runde. Resultater hentes automatisk fra football-data.org og kommer lidt efter slutfløjt." })));
+    h("p", { text: "Højst 11 spillere, som et fodboldhold. Tabellen tæller hele sæsonen. Rundens vinder er den med flest point i en færdigspillet runde. Resultater hentes automatisk fra football-data.org og kommer lidt efter slutfløjt." })));
 
   const today = new Date().toISOString().slice(0, 10);
   main.append(h("div", { class: "card quote-card" }, h("h3", { text: "Dagens citat" }), quoteEl(quote("generelt", today), "q-paper", "dagens:" + today)));
@@ -1137,7 +1138,7 @@ function adminCard() {
   return h("div", { class: "card" },
     h("h2", { text: "Administrator" }),
     codeP,
-    h("p", { class: "muted", text: `Send linket til appen og koden til de andre. ${S.players.length} af 10 pladser er taget.` }),
+    h("p", { class: "muted", text: `Send linket til appen og koden til de andre. ${S.players.length} af ${MAX_PLAYERS} pladser er taget.` }),
     h("div", { class: "row" },
       h("button", { class: "btn", onclick: async (e) => {
         e.target.disabled = true;
