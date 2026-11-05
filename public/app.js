@@ -2,6 +2,7 @@
 "use strict";
 
 const MAX_PLAYERS = 11; // et fodboldhold. Skal passe med grænsen i databasen
+const ADMIN_NAME = "Jorge Infantilo"; // navnet, administratorens beskeder sendes under
 const ROW = 44;        // højde på et tal i hjulet (px), skal matche --row i CSS
 const MAX_GOALS = 12;  // højeste tal på hjulet
 const DONE = ["FINISHED", "AWARDED"];
@@ -197,6 +198,8 @@ async function loadAll() {
     S.sb.from("pl_scorers").select("*").order("rank"),
   ]);
   S.plTable = st.error ? null : st.data; S.plScorers = sc.error ? [] : sc.data;
+  const an = await S.sb.from("announcements").select("id, body, created_at").order("id", { ascending: false }).limit(5);
+  S.annOff = !!an.error; S.anns = an.error ? [] : an.data;
   S.myTips = new Map(mt.data.map((t) => [t.match_id, { home: t.home, away: t.away }]));
   S.me = S.players.find((p) => p.user_id === id) || null;
 }
@@ -306,6 +309,7 @@ function render() {
 
 // ---------- Kampe ----------
 function renderRound(main) {
+  const ann = annCard(); if (ann) main.append(ann);
   const rs = rounds();
   if (!rs.length) {
     main.append(h("div", { class: "card notice" }, h("h2", { text: "Ingen kampe endnu" }),
@@ -736,6 +740,52 @@ function renderProgress(main) {
   main.append(card);
 }
 
+// ---------- Beskeder fra administratoren ----------
+const megaphone = () => { const s = document.createElement("span"); s.className = "mega"; s.setAttribute("aria-hidden", "true"); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h2l5 4V5L6 9H4a1 1 0 0 0-1 1zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="currentColor"/></svg>'; return s; };
+function annCard() {
+  const a = (S.anns || [])[0];
+  if (!a || !S.me || a.id <= (S.me.seen_announcement || 0)) return null;
+  const d = new Date(a.created_at);
+  const card = h("section", { class: "ann", role: "status", "aria-label": `Besked fra ${ADMIN_NAME}` },
+    h("div", { class: "ann-head" }, megaphone(), h("div", {}, h("p", { class: "ann-from", text: `Besked fra ${ADMIN_NAME}` }), h("p", { class: "ann-date", text: `${fmtDay(d)} kl. ${fmtTime(d)}` }))),
+    h("p", { class: "ann-body", text: a.body }),
+    h("button", { class: "btn flood", type: "button", onclick: async () => {
+      S.me.seen_announcement = a.id;
+      card.classList.add("gone"); setTimeout(() => card.remove(), reduceMotion ? 0 : 300);
+      await S.sb.from("players").update({ seen_announcement: a.id }).eq("user_id", uid());
+    } }, "Forstået"));
+  return card;
+}
+function annAdmin() {
+  if (S.annOff) return h("p", { class: "muted", text: "Beskeder er ikke sat op endnu. Kør beskeder.sql i Supabase." });
+  const ta = h("textarea", { class: "anninput", id: "anninput", maxlength: "600", rows: "4", placeholder: "Fx: Velkommen til vores nye spillere, Mads og Anne!" });
+  const left = h("span", { class: "muted", style: "font-size:13px" });
+  ta.addEventListener("input", () => { left.textContent = `${600 - ta.value.length} tegn tilbage`; });
+  const list = h("ul", { class: "annlist" }, (S.anns || []).map((a) => h("li", {},
+    h("span", { text: `${fmtShort(a.created_at)}: ${a.body.length > 70 ? a.body.slice(0, 70) + "…" : a.body}` }),
+    h("button", { class: "linkbtn", type: "button", onclick: async () => {
+      if (!confirm("Slet beskeden?")) return;
+      const { error } = await S.sb.from("announcements").delete().eq("id", a.id);
+      toast(error ? "Beskeden blev ikke slettet" : "Besked slettet"); if (!error) { await loadAll(); render(); }
+    } }, "Slet"))));
+  return h("div", { class: "annadmin" },
+    h("h3", { text: "Besked til alle spillere" }),
+    h("p", { class: "muted", text: `Vises øverst under Kampe, første gang hver spiller kommer forbi. Den sendes som ${ADMIN_NAME}.` }),
+    h("label", { for: "anninput", class: "sr" }, "Besked"), ta, left,
+    h("div", { class: "row", style: "margin-top:8px" }, h("button", { class: "btn flood", type: "button", onclick: async (e) => {
+      const body = ta.value.trim(); if (!body) return toast("Skriv en besked først");
+      e.target.disabled = true;
+      const { data, error } = await S.sb.from("announcements").insert({ body }).select().single();
+      e.target.disabled = false;
+      if (error) return toast("Beskeden blev ikke sendt");
+      // administratoren har selv set sin besked
+      await S.sb.from("players").update({ seen_announcement: data.id }).eq("user_id", uid());
+      toast("Beskeden er sendt til alle spillere"); await loadAll(); render();
+    } }, "Send besked")),
+    S.anns && S.anns.length ? h("p", { class: "muted", style: "margin:14px 0 4px", text: "Seneste beskeder" }) : null,
+    S.anns && S.anns.length ? list : null);
+}
+
 // ---------- Kommentarer: talebobler til kampe og til stillingen ----------
 // Hver tråd har en nøgle: kampens id, eller "topic:stilling" for sæsonstillingen.
 S.comments = new Map();
@@ -1136,7 +1186,7 @@ function adminCard() {
   S.sb.rpc("get_invite_code").then(({ data }) => { codeP.textContent = data ? `Invitationskode: ${data}` : "Invitationskoden kunne ikke hentes."; });
   const toggle = h("input", { type: "checkbox", id: "admtoggle", checked: S.admin, onchange: (e) => { S.admin = e.target.checked; toast(S.admin ? "Resultatfelter vises under Kampe" : "Resultatfelter skjult"); } });
   return h("div", { class: "card" },
-    h("h2", { text: "Administrator" }),
+    h("h2", { text: `Administrator: ${ADMIN_NAME}` }),
     codeP,
     h("p", { class: "muted", text: `Send linket til appen og koden til de andre. ${S.players.length} af ${MAX_PLAYERS} pladser er taget.` }),
     h("div", { class: "row" },
@@ -1149,6 +1199,7 @@ function adminCard() {
         if (r.ok) { S.round = null; await loadAll(); S.round = defaultRound(); await loadRoundTips(); }
       } }, "Hent kampe nu")),
     h("label", { for: "admtoggle", class: "check" }, toggle, h("span", { text: "Vis felter til manuelle resultater under Kampe" })),
+    annAdmin(),
     usersSection());
 }
 

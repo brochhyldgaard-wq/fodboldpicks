@@ -531,3 +531,22 @@ table.pl tr.z-releg-pl td:first-child { box-shadow: inset 4px 0 0 var(--red); }
 .texp { font-size: 12px; color: rgba(255,255,255,.5); }
 .treplybtn { background: none; border: 1.5px solid var(--led); color: var(--led); font: 800 12px var(--display); letter-spacing: 1px; text-transform: uppercase; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
 .treplyform { margin: 2px 0 0 30px; }
+
+/* ---------- Besked fra administratoren ---------- */
+.ann { margin-top: 14px; padding: 18px 18px 16px; border-radius: 16px; color: var(--chalk);
+  background: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1.6px) 0 0 / 6px 6px, linear-gradient(135deg, #1a1608, #0e0c04);
+  border: 2px solid var(--led); box-shadow: 0 0 22px rgba(255,201,40,.3), 0 10px 24px rgba(0,0,0,.5); }
+.ann-head { display: flex; align-items: center; gap: 12px; }
+.mega { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--led); color: #231a00; }
+.mega svg { width: 24px; height: 24px; }
+.ann-from { margin: 0; font: 800 20px/1.1 var(--display); letter-spacing: 1px; text-transform: uppercase; color: var(--led); }
+.ann-date { margin: 2px 0 0; font-size: 13px; color: rgba(255,255,255,.6); }
+.ann-body { margin: 14px 0 16px; font-size: 17px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) { .ann { animation: annin .5s cubic-bezier(.2,1.3,.4,1); } .ann.gone { animation: annout .3s ease-in forwards; } }
+@keyframes annin { from { transform: translateY(-10px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes annout { to { transform: scale(.95); opacity: 0; } }
+.annadmin { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--paper-line); }
+.anninput { width: 100%; font: 500 16px/1.4 var(--body); padding: 10px 12px; border: 2px solid var(--paper-line); border-radius: 10px; background: #fff; color: #132a1c; resize: vertical; }
+.annlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.annlist li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
